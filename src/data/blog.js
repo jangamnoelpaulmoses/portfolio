@@ -8,6 +8,7 @@ import generated from './generated-posts.json';
 //   - { t: 'callout', label?, text }
 //   - { t: 'code', lang?, code }
 //   - { t: 'ul' | 'ol', items: [] }
+//   - { t: 'image', src, alt }   (auto-generated posts; hero also set as post.cover)
 
 export const blogMeta = {
   title: 'Journal',

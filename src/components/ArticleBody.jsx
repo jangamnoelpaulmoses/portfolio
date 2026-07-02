@@ -115,6 +115,18 @@ function Block({ block, accent }) {
     case 'divider':
       return <div className="grad-line my-2" />;
 
+    case 'image':
+      return (
+        <motion.figure {...reveal} className="my-1">
+          <img
+            src={block.src}
+            alt={block.alt || ''}
+            loading="lazy"
+            className="w-full rounded-2xl border border-bone/10"
+          />
+        </motion.figure>
+      );
+
     default:
       return null;
   }

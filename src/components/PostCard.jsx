@@ -27,6 +27,16 @@ export default function PostCard({ post, index = 0, large = false }) {
           large ? 'md:gap-7' : ''
         }`}
       >
+        {post.cover && (
+          <div className="relative z-10 -mx-6 -mt-6 mb-1 overflow-hidden rounded-t-[inherit] md:-mx-8 md:-mt-8">
+            <img
+              src={post.cover}
+              alt=""
+              loading="lazy"
+              className="aspect-[16/9] w-full object-cover"
+            />
+          </div>
+        )}
         <div className="relative z-10 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.22em] text-bone/55">
           <span
             className="rounded-full border px-2.5 py-1"

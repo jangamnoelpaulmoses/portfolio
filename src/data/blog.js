@@ -1,3 +1,5 @@
+import generated from './generated-posts.json';
+
 // Journal — long-form writing.
 // Articles adapted and expanded from Noel's field notes & LinkedIn essays.
 //
@@ -12,7 +14,7 @@ export const blogMeta = {
   dek: 'Field notes on agentic AI, system design, and shipping software that survives contact with the real world.',
 };
 
-export const posts = [
+const handWritten = [
   {
     slug: 'loop-engineering',
     title: 'Loop Engineering: Stop Prompting, Start Delegating',
@@ -335,6 +337,12 @@ export const posts = [
     ],
   },
 ];
+
+// Hand-written essays + auto-generated posts (from the Portfolio Journal Sync
+// n8n workflow) merged into one feed, newest first.
+export const posts = [...handWritten, ...generated].sort((a, b) =>
+  b.date.localeCompare(a.date)
+);
 
 // Convenience lookups
 export const getPost = (slug) => posts.find((p) => p.slug === slug);

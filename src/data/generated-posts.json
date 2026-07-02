@@ -435,5 +435,102 @@
         "text": "Measure the output. Not the vibe."
       }
     ]
+  },
+  {
+    "slug": "claude-code-steganography-hidden-markers",
+    "title": "Claude Code Is Steganographically Marking Its Requests. Here Is Why That Should Change How You Think About AI Dev Tools.",
+    "dek": "A researcher found hidden signals embedded inside Claude Code's outbound requests. No credentials were leaked, no CVE was filed — but the architectural implications for agentic tool trust are serious and underexplored.",
+    "date": "2026-07-02",
+    "readMins": 6,
+    "category": "Security",
+    "accent": "#ff4d6d",
+    "featured": false,
+    "excerpt": "When a researcher published findings showing Claude Code embeds hidden markers inside the requests it sends, most engineers scrolled past it because nothing obviously broke. That reaction is the problem. The steganography story is not about a vulnerability in the classical sense — it is about a class of trust boundary that the industry has not yet built the instincts to defend.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "When a researcher published findings showing Claude Code embeds hidden markers inside the requests it sends, most engineers scrolled past it because nothing obviously broke. No passwords leaked. No CVE number to paste into a Jira ticket. That reaction is the problem. The steganography story is not about a vulnerability in the classical sense — it is about a class of trust boundary that the industry has not yet built the instincts to defend, and it arrived quietly inside a tool that hundreds of thousands of developers run in their terminals every day."
+      },
+      {
+        "t": "h2",
+        "text": "What Steganography in an AI Dev Tool Actually Means"
+      },
+      {
+        "t": "p",
+        "text": "Steganography is the practice of hiding information inside other data so that the existence of the hidden information is itself concealed. It is distinct from encryption, where the existence of a secret is obvious even if the content is not. In a text-based context — which is exactly the medium Claude Code operates in — the classic steganographic carriers are zero-width Unicode characters, homoglyphs that look identical to their ASCII counterparts in any rendered UI, and whitespace patterns that are invisible in pretty-printed logs. None of these show up when you read the prompt in a terminal. None of them show up in most observability dashboards. They are, by design, not there until you go looking with the right tooling."
+      },
+      {
+        "t": "p",
+        "text": "The researcher's finding, published on thereallo.dev, is that Claude Code is doing something in this family: embedding signals inside the request payloads it fires at Anthropic's API. The exact mechanism and the full semantics of those signals are not what I want to dwell on here, because the specific implementation details will change. What will not change is the structural fact that the tool chose to attach information to outbound traffic that is not surfaced to the user in any readable way. That is the thing worth examining."
+      },
+      {
+        "t": "h2",
+        "text": "The Outbound Surface Problem Nobody Is Talking About"
+      },
+      {
+        "t": "p",
+        "text": "There is an enormous amount of conversation in the AI security space about what data comes into an LLM-backed tool — prompt injection, retrieval poisoning, context window leakage. The inbound surface gets the attention because it maps to familiar threat models: an attacker manipulates the input, the model does something bad. Clean and legible. The outbound surface is more uncomfortable to think about because it implicates the tool vendor themselves, not a third-party adversary. But the outbound surface is real, it is large, and it is almost entirely unaudited in most engineering organizations."
+      },
+      {
+        "t": "p",
+        "text": "When you install Claude Code, Cursor, GitHub Copilot, or any locally-running LLM-backed tool, you are granting that process a network socket. That process decides, at runtime, what it puts into every HTTP request it makes. The prompt you see rendered in the UI is not necessarily the payload that leaves your machine. There may be additional headers, there may be metadata fields in the request body, there may be — as this finding demonstrates — content embedded steganographically inside the prompt text itself. The user-visible interface and the actual network payload are not the same artifact, and there is no standard mechanism that forces them to be."
+      },
+      {
+        "t": "p",
+        "text": "This is not a hypothetical attack surface. The moment a tool has the ability to embed markers, it has the general capability to embed arbitrary signals. A session fingerprint. A behavioral signature built from your edit patterns. A stable identifier derived from your project structure. Whether or not any of these things are happening today is almost beside the point. The capability exists, and you are not in a position to verify the boundary without active instrumentation."
+      },
+      {
+        "t": "callout",
+        "text": "The prompt you read in the UI and the payload that leaves your machine are different artifacts. For most AI dev tools, there is no user-visible mechanism that guarantees they are identical. That gap is the outbound trust surface.",
+        "label": "The core tension"
+      },
+      {
+        "t": "h2",
+        "text": "Auditing Outbound Traffic From AI Tooling: Where to Start"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/claude-code-steganography-hidden-markers/2.png",
+        "alt": "Auditing Outbound Traffic From AI Tooling: Where to Start"
+      },
+      {
+        "t": "p",
+        "text": "The right mental model here is the same one you would apply to any third-party SDK that makes network calls on your behalf. You would not ship a payment SDK to production without knowing what endpoints it calls, what it puts in the request body, and what headers it attaches. You would not give an analytics library access to user PII without auditing what it actually sends versus what the docs say it sends. AI dev tools deserve the same treatment, and the fact that they run locally on developer machines rather than in your production cluster does not reduce the exposure — it may increase it, because developer machines have access to source code, credentials, internal tooling, and organizational context that production services often do not."
+      },
+      {
+        "t": "p",
+        "text": "The first step is passive visibility. Running a local proxy between your AI tooling and the outside world lets you see the full request and response payloads as they actually appear on the wire. Tools in this space are mature and straightforward to set up. You configure the tool to route through the proxy, and you inspect what comes out."
+      },
+      {
+        "t": "code",
+        "code": "# Route Claude Code (or any LLM-backed CLI tool) through mitmproxy\n# to inspect the actual outbound payload on the wire.\n\n# Start mitmproxy on a local port\nmitmproxy --listen-port 8080\n\n# In a separate shell, set the proxy env vars before launching the tool\nexport HTTP_PROXY=http://127.0.0.1:8080\nexport HTTPS_PROXY=http://127.0.0.1:8080\n\n# Trust the mitmproxy CA cert so TLS inspection works\n# (mitmproxy generates one at ~/.mitmproxy/mitmproxy-ca-cert.pem)\nexport NODE_EXTRA_CA_CERTS=~/.mitmproxy/mitmproxy-ca-cert.pem\n\n# Now run the tool normally — every outbound request is visible in the proxy UI\nclaude",
+        "lang": "bash"
+      },
+      {
+        "t": "p",
+        "text": "Once you have the raw payloads, the next step is looking for steganographic content specifically. Zero-width characters in Unicode are a common carrier: Zero Width Space (U+200B), Zero Width Non-Joiner (U+200C), Zero Width Joiner (U+200D), and the Word Joiner (U+2060) are all invisible in standard rendering but trivially detectable by scanning the byte sequence. A simple script that extracts the prompt field from a captured request and checks for non-printing Unicode codepoints will tell you whether this class of technique is in use."
+      },
+      {
+        "t": "code",
+        "code": "# Scan a captured prompt string for common steganographic Unicode carriers.\n# Pipe a JSON request body into this, or pass the prompt text directly.\n\nimport sys\nimport unicodedata\n\nZERO_WIDTH_CHARS = {\n    '\\u200B': 'ZERO WIDTH SPACE',\n    '\\u200C': 'ZERO WIDTH NON-JOINER',\n    '\\u200D': 'ZERO WIDTH JOINER',\n    '\\u2060': 'WORD JOINER',\n    '\\uFEFF': 'ZERO WIDTH NO-BREAK SPACE (BOM)',\n    '\\u200E': 'LEFT-TO-RIGHT MARK',\n    '\\u200F': 'RIGHT-TO-LEFT MARK',\n}\n\ndef scan(text):\n    findings = []\n    for i, ch in enumerate(text):\n        if ch in ZERO_WIDTH_CHARS:\n            findings.append((i, hex(ord(ch)), ZERO_WIDTH_CHARS[ch]))\n    return findings\n\nif __name__ == '__main__':\n    payload = sys.stdin.read()\n    results = scan(payload)\n    if results:\n        print(f'Found {len(results)} zero-width character(s):')\n        for pos, codepoint, name in results:\n            print(f'  position {pos}: {codepoint} ({name})')\n    else:\n        print('No zero-width steganographic characters detected.')",
+        "lang": "python"
+      },
+      {
+        "t": "h2",
+        "text": "The Agentic Trust Surface Is Here and It Is Underspecified"
+      },
+      {
+        "t": "p",
+        "text": "What makes this finding more than a one-off curiosity is the timing. We are in the early phase of agentic AI tooling — tools that do not just answer questions but take actions, call APIs, write files, run shell commands, and increasingly operate autonomously across multi-step workflows. In that world, the outbound surface expands dramatically. Every action an agent takes is potentially a carrier for metadata the user did not author. Every API call it makes on your behalf can contain signals you cannot see. The trust model for agentic tools has to be built now, before the category matures to the point where these behaviors are deeply baked in and much harder to change."
+      },
+      {
+        "t": "p",
+        "text": "The engineering takeaway is not to stop using AI dev tools. The takeaway is to stop treating them as local processes with no network consequence. Audit your outbound traffic with the same rigor you apply to third-party SDKs. Know what your trust boundary is, and instrument it. If a tool is embedding data you did not author into payloads leaving your machine, you should be the one who finds that out — not a researcher posting to Hacker News."
+      },
+      {
+        "t": "quote",
+        "text": "The prompt you see in the UI is not necessarily the payload that leaves your machine. That gap is not theoretical. It is the outbound trust surface, and right now most engineering teams are flying blind across it."
+      }
+    ]
   }
 ]

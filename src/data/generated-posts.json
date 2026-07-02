@@ -637,5 +637,101 @@
         "text": "The local AI dev stack is maturing fast, and the decisions that matter most are not which model scores highest on a leaderboard. They are which model fits in the hardware you have, stays coherent across the number of turns your workflow requires, and keeps your iteration loop fast enough that building and debugging feels like software engineering and not like waiting. Right now, for a lot of builders on real hardware, 27B is that number."
       }
     ]
+  },
+  {
+    "slug": "herdr-agent-multiplexer-terminal",
+    "title": "Herdr and the Agent Multiplexer Problem: Why Running Five Agents at Once Will Break Your Brain",
+    "dek": "Herdr is an open-source agent multiplexer that lives in your terminal. But the real story is the systems design gap it exposes — the missing infra layer between writing one agent and operating a fleet of them.",
+    "date": "2026-07-02",
+    "readMins": 7,
+    "category": "Agentic AI",
+    "accent": "#7c5cff",
+    "featured": false,
+    "excerpt": "Running one AI agent is easy. Running five at once exposes a class of orchestration problems the agentic ecosystem has barely started to solve. Herdr is an open-source terminal multiplexer for agents, and thinking carefully about how it works forces you to confront the real UX and systems design challenges lurking under every multi-agent setup.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "Running one AI agent is easy. You give it a goal, wire up a few tools, watch the loop tick, and intervene when it derails. The feedback cycle is tight enough that your brain can hold the whole thing at once. Now try running five. Suddenly you have five context windows drifting in different directions, five tool-call histories you cannot mentally diff against each other, and five silent failure modes that will not announce themselves the way a crashed process does. That is the problem Herdr is trying to solve, and it is a more interesting engineering problem than it first appears."
+      },
+      {
+        "t": "p",
+        "text": "Herdr is an open-source agent multiplexer that lives in your terminal. The pitch is straightforward: one place to spawn, monitor, and switch between multiple running agents. The closest analogy in the developer's existing mental model is tmux — the terminal multiplexer that lets you split a single terminal session into panes and windows, each running its own shell process independently. Herdr reaches for the same idea but applies it one layer up, at the agentic loop rather than the shell process. That analogy is useful, but it also hides some genuine complexity, because an agentic loop is not a shell process. The failure modes are different, the state is richer and messier, and the cost of getting it wrong is higher."
+      },
+      {
+        "t": "h2",
+        "text": "Why the Terminal Is the Right Starting Point"
+      },
+      {
+        "t": "p",
+        "text": "There is a temptation to reach immediately for a web dashboard when you are building operator tooling. Dashboards look impressive, they are easy to demo, and they feel like the natural home for monitoring. But for a working engineer who lives in a terminal, a browser tab is a context switch. It breaks the flow. Every time you alt-tab to check on an agent, you lose the thread of whatever you were doing. tmux became foundational infrastructure not because it was technically superior to other approaches but because it respected the operator's attention. It let you keep multiple things visible without forcing you out of the environment where you were already working."
+      },
+      {
+        "t": "p",
+        "text": "A terminal-native agent multiplexer makes the same bet. The hypothesis is that the operator's attention is the scarcest resource in a multi-agent system, and the interface should be designed around protecting it rather than consuming it. That means surfacing just enough signal per agent to let you triage without reading full transcripts, and making it cheap to switch focus when something actually needs your eyes on it. Getting that balance right is a product problem as much as a systems problem, and most of the existing tooling in the agentic ecosystem has not seriously engaged with it yet."
+      },
+      {
+        "t": "h2",
+        "text": "The Four Hard Problems Under the Hood"
+      },
+      {
+        "t": "p",
+        "text": "When you start thinking about what a multiplexer actually needs to do internally, four distinct problems emerge. Each one is solvable in isolation, but solving them simultaneously inside a terminal interface is where the real engineering work lives."
+      },
+      {
+        "t": "ul",
+        "items": [
+          "Heterogeneous state: Each agent carries its own context window, its own tool call history, and its own set of partial or buffered outputs. Unlike OS processes, where the kernel gives you a uniform abstraction over all of them, agent state has no universal schema. A multiplexer has to decide what slice of that state to surface, how to summarize it, and how to make it comparable across agents that may be running on different models or frameworks.",
+          "Shared resource contention: If two agents are operating against the same file, the same database table, or the same external API, you have a classic concurrency problem dressed in new clothes. The multiplexer cannot solve this through observation alone. You need either explicit isolation — giving each agent its own sandboxed environment — or a locking and coordination protocol that agents participate in. Neither is trivial to implement, and neither is something a process manager alone can give you.",
+          "Silent failure modes: A crashed OS process generates a signal. A looping agent does not. An agent that has hit a rate limit and is waiting silently looks exactly like an agent that is making steady progress. An agent that has entered a degenerate reasoning loop — repeatedly calling the same tool with marginally different arguments — will not surface that fact unless something is actively watching for it. Health signaling for agentic loops needs to be designed explicitly, not assumed.",
+          "Human context switching cost: The whole value proposition of running multiple agents is that you offload work and reclaim attention. A bad multiplexer inverts this. Instead of five agents doing work while you focus elsewhere, you have five agents demanding attention simultaneously and a dashboard that is itself a source of cognitive load. The interface has to earn the right to interrupt you."
+        ]
+      },
+      {
+        "t": "h2",
+        "text": "The Right Mental Model: A Lightweight Orchestration Layer"
+      },
+      {
+        "t": "p",
+        "text": "The framing that makes the most sense to me is not a process manager and not a full orchestration platform. It is something in between — a lightweight orchestration layer that sits at the boundary between your terminal and a miniature control plane. A process manager like supervisord knows how to start, stop, and restart processes, and it knows how to tail their stdout. That is necessary but not sufficient for agents. A full orchestration platform like a Kubernetes-based setup gives you sophisticated scheduling, health checking, and resource isolation, but it is enormously heavyweight to operate for what is often an interactive, exploratory workflow."
+      },
+      {
+        "t": "p",
+        "text": "What a tool like Herdr is reaching for is something that has the operational simplicity of a terminal tool but the conceptual model of a control plane. It needs to understand enough about agentic loop semantics to surface meaningful status, not just process status. The difference matters. A process can be running but an agent can be stuck. A process can exit with code zero but an agent can have failed to accomplish anything useful. The right abstractions here are still being invented, which is part of what makes this space genuinely interesting to work in right now."
+      },
+      {
+        "t": "callout",
+        "text": "The isolation problem is worth dwelling on specifically. If you are running agents that write to the filesystem, one practical mitigation is to give each agent its own working directory and use a naming convention that makes collisions visible. This does not prevent logical conflicts — two agents updating different parts of the same configuration file, for example — but it reduces the blast radius of the most common class of accident. More sophisticated setups use containerization or virtual filesystems per agent session, but that adds operational overhead that may not be justified for smaller fleets.",
+        "label": "Systems Thinking Note"
+      },
+      {
+        "t": "code",
+        "code": "# A minimal pattern for isolated agent workspaces\n# Each agent session gets its own directory scoped by session ID\n\nAGENT_SESSION_ID=$(uuidgen)\nAGENT_WORKDIR=\"/tmp/agent-sessions/${AGENT_SESSION_ID}\"\nmkdir -p \"${AGENT_WORKDIR}\"\n\n# Launch agent with scoped working directory\ncd \"${AGENT_WORKDIR}\" && your-agent-runner --config agent.yaml",
+        "lang": "bash"
+      },
+      {
+        "t": "h2",
+        "text": "The Infra Gap and Why It Matters Now"
+      },
+      {
+        "t": "p",
+        "text": "The agentic ecosystem right now is heavily weighted toward the model layer and the framework layer. There are many tools for defining what an agent does — how it reasons, which tools it calls, how its memory is structured. There are far fewer tools for operating agents at any kind of scale, even at the modest scale of a single engineer running several agents in parallel during a working session. This is the gap Herdr is pointing at, and it is a real one."
+      },
+      {
+        "t": "p",
+        "text": "The historical parallel worth keeping in mind is early container tooling. Before Docker, the primitives for running containerized processes existed in the Linux kernel — namespaces, cgroups, union filesystems — but the developer experience of actually using them was painful enough that almost nobody did. Docker did not invent containers. It built the UX layer that made containers accessible and composable, and that UX layer turned out to be as valuable as the underlying technology. The agentic ecosystem is at a similar moment. The primitives exist. LLMs can reason and call tools. Frameworks like LangChain and AutoGen and CrewAI can wire up complex multi-step workflows. But the operational UX layer — the thing that makes running a fleet of agents feel as natural as running a screen session — is almost entirely absent."
+      },
+      {
+        "t": "p",
+        "text": "Projects like Herdr are early. The design decisions are still being worked out, and the right abstractions are not fully settled. But the direction is correct. If you are building in the agentic space and you find yourself spending more time babysitting agents than doing the work you pointed them at, that is a tooling problem, not a model problem. The terminal multiplexer for agents is infrastructure the ecosystem needs, and the engineers who figure out the right design will have built something genuinely foundational."
+      },
+      {
+        "t": "quote",
+        "text": "The right mental model here is not just a process manager. It is closer to a lightweight orchestration layer — somewhere between a terminal and a miniature control plane."
+      },
+      {
+        "t": "p",
+        "text": "The engineering takeaway is this: before you wire up your next multi-agent system, think explicitly about your operational model. How will you know when an agent is stuck versus progressing? How will you prevent two agents from clobbering a shared resource? How will you triage across five running sessions without burning your entire attention budget on monitoring? These are not questions the model answers. They are questions the tooling layer answers, and right now, you mostly have to build that layer yourself. Herdr is a signal that someone is taking these questions seriously. It is worth watching."
+      }
+    ]
   }
 ]

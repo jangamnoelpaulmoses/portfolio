@@ -1,1 +1,114 @@
-[]
+[
+  {
+    "slug": "senior-swe-bench-agent-evaluation",
+    "title": "SWE-Bench Was Too Easy. Senior SWE-Bench Is the Benchmark Agentic AI Actually Needs.",
+    "dek": "Snorkel AI's Senior SWE-Bench raises the evaluation ceiling from junior-level issue resolution to the kind of ambiguous, architectural thinking that actually separates good engineers from great ones. Here is why that gap matters more than your leaderboard number.",
+    "date": "2026-07-01",
+    "readMins": 7,
+    "category": "Agentic AI",
+    "accent": "#7c5cff",
+    "featured": false,
+    "excerpt": "Passing a benchmark is not the same as being useful in production. The gap between those two things is exactly where most agentic systems quietly fall apart — and Senior SWE-Bench is the first serious attempt to close it.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "For a while, SWE-Bench felt like the right test. It grounded AI agent evaluation in something concrete and verifiable: give the agent a real GitHub issue from a real open-source repository, let it write code, run the test suite, check if the issue is resolved. No hand-waving, no vibes-based scoring. That rigor was genuinely valuable when most agents could barely navigate a codebase without hallucinating import paths. But something shifted. Agents started scoring high enough that the benchmark stopped being informative. The ceiling it set turned out to be surprisingly low, and the industry optimized straight into it. Snorkel AI noticed this and built something harder: Senior SWE-Bench, an open-source benchmark designed to evaluate agents not on whether they can close a ticket, but on whether they demonstrate the kind of judgment that earns someone a senior title."
+      },
+      {
+        "t": "h2",
+        "text": "What Standard SWE-Bench Actually Tests"
+      },
+      {
+        "t": "p",
+        "text": "To understand why Senior SWE-Bench matters, you have to be precise about what the original benchmark is and is not testing. SWE-Bench presents an agent with a GitHub issue and the corresponding repository state at the time the issue was filed. The agent produces a patch. The patch is applied and the test suite runs. Pass or fail."
+      },
+      {
+        "t": "p",
+        "text": "That setup has a few structural properties worth naming. First, the task is fully specified. Someone already did the work of understanding the problem well enough to write it up as a GitHub issue. The agent never has to question whether the issue description is accurate, whether the reported behavior is actually a bug or an intentional design choice, or whether fixing it at the location the issue points to is even the right approach. Second, the scope is bounded. The agent is not choosing which file to look at out of a monorepo with hundreds of thousands of lines of context. The relevant surface area is reasonably contained. Third, the success criterion is binary and externally defined. Tests pass or they do not. The agent does not have to make a judgment call about whether a solution is clean, maintainable, or aligned with the rest of the codebase's architecture."
+      },
+      {
+        "t": "p",
+        "text": "None of this makes SWE-Bench a bad benchmark. It was genuinely useful for separating agents that could reason about code from those that could not. The problem is that it became a ceiling, and agents have been hitting that ceiling with increasing regularity. When a benchmark stops discriminating between systems of different quality, it stops being an evaluation tool and starts being a marketing one."
+      },
+      {
+        "t": "h2",
+        "text": "What Senior Engineering Actually Looks Like as a Specification"
+      },
+      {
+        "t": "p",
+        "text": "If you want to build a harder benchmark, you have to be rigorous about what you are trying to measure. The word senior gets used loosely, so it is worth pinning it down in terms an evaluation can actually capture."
+      },
+      {
+        "t": "p",
+        "text": "Senior engineers deal with ambiguity as a first-class input. Requirements arrive incomplete, contradictory, or framed in terms of symptoms rather than root causes. A junior engineer asks for clarification. A senior engineer develops a model of what the requester probably wants, identifies the cases where interpretations diverge, and either makes a defensible call or surfaces the specific ambiguity that actually needs a decision. Encoding this into a benchmark means the task description itself has to be underspecified in structured ways."
+      },
+      {
+        "t": "p",
+        "text": "Senior engineers also make architectural tradeoffs explicitly. They do not just find a way to make the tests pass. They reason about what the solution forecloses, what it enables, and what assumptions it bakes in. A fix that works today but paints the codebase into a corner is not a good fix, even if the CI pipeline is green. Evaluating this requires the benchmark to include tasks where the naive solution is subtly wrong in a way that only becomes visible when you think about the surrounding system."
+      },
+      {
+        "t": "ul",
+        "items": [
+          "Knowing what not to change, and articulating why, is as important as knowing what to change",
+          "Pushing back on a task description is sometimes the correct output",
+          "Code review-readability is a real quality dimension that test pass rates do not capture",
+          "Preserving existing abstractions unless there is a genuine reason to break them is a mark of craft"
+        ]
+      },
+      {
+        "t": "p",
+        "text": "That last point about abstractions is one I keep running into with agentic systems in practice. An agent handed a moderately complex task will frequently reach into layers of the codebase it has no business touching, not because the fix requires it but because the agent has no internalized sense of what belongs to it and what does not. A senior engineer has a strong prior toward minimal blast radius. Most agents do not."
+      },
+      {
+        "t": "h2",
+        "text": "The Production Gap and Why Benchmarks Create It"
+      },
+      {
+        "t": "p",
+        "text": "There is a pattern I have watched play out enough times to find it predictable. A team evaluates an agent on a standard benchmark, sees a strong number, deploys it into a real workflow, and then discovers a category of failure that the benchmark never surfaced. The agent over-engineers a straightforward fix by introducing an abstraction layer that was not asked for and is not needed. It produces code that passes every automated check but gets rejected in code review because it violates conventions the test suite has no opinion about. It makes a change that is technically correct in isolation but breaks an implicit contract between two modules that the original author understood and the agent did not."
+      },
+      {
+        "t": "p",
+        "text": "These failures are not random. They are structurally predicted by the benchmark the agent was optimized against. If your evaluation never asks whether a solution is the right scope for the problem, you should not be surprised when your agent consistently scopes solutions incorrectly. If your evaluation never penalizes touching code that did not need to be touched, you should not be surprised when your agent has a wide blast radius. Benchmarks are not just measurement tools. They are training signals, directly or indirectly, because they determine what the field optimizes for."
+      },
+      {
+        "t": "callout",
+        "text": "When the evaluation ceiling is junior-level task completion, that is the ceiling the agent hits in production too. Not because the agent is incapable of more, but because the optimization target never demanded it.",
+        "label": "The Core Problem"
+      },
+      {
+        "t": "p",
+        "text": "This is why Senior SWE-Bench is worth paying attention to regardless of whether you are currently running agent evaluations. The benchmark is making a claim about what the relevant dimensions of engineering quality actually are. Studying the task design is itself an education in what rigorous agentic evaluation looks like."
+      },
+      {
+        "t": "h2",
+        "text": "How to Actually Use a Benchmark Like This"
+      },
+      {
+        "t": "p",
+        "text": "The naive use of a benchmark is to run your agent against it and report a score. That is fine, but it is the least interesting thing you can do with Senior SWE-Bench. The more valuable exercise is to treat it as a taxonomy of failure modes."
+      },
+      {
+        "t": "p",
+        "text": "Pull a representative sample of tasks from the benchmark and categorize what kind of judgment each one is testing. Some tasks are probably testing scope discipline: the agent needs to make a minimal, targeted change. Others are probably testing architectural awareness: the agent needs to recognize that the right fix is not at the location the symptom appears. Others might test the ability to reason about what a change should not do. Build that taxonomy for yourself. Then look at your agent's failure cases against each category separately."
+      },
+      {
+        "t": "code",
+        "code": "# Clone the Senior SWE-Bench repository once it is publicly available\ngit clone https://github.com/snorkelai/senior-swe-bench\ncd senior-swe-bench\n\n# Inspect the task structure before running anything\nls tasks/\ncat tasks/<sample_task_id>/problem_statement.md\n\n# Run evaluation against a subset to understand failure distribution\npython evaluate.py --agent your_agent --tasks tasks/ --subset 50 --output results.json",
+        "lang": "bash"
+      },
+      {
+        "t": "p",
+        "text": "The commands above are illustrative of the workflow rather than a guarantee of the exact interface, but the principle holds: before you optimize your agent against the aggregate score, understand the internal structure of what is being tested. Aggregate scores on complex benchmarks hide more than they reveal."
+      },
+      {
+        "t": "p",
+        "text": "Beyond evaluation, the benchmark is useful as a source of task templates for building your own internal evals. If you are working on an agentic system that operates on a specific codebase or domain, the task design patterns in Senior SWE-Bench can inform how you construct tasks that actually discriminate between agents with different levels of engineering judgment. The hardest part of building good evals is usually not the infrastructure. It is knowing what to put in the tasks. A well-designed public benchmark gives you examples of that craft for free."
+      },
+      {
+        "t": "p",
+        "text": "The engineering takeaway is straightforward. If you are building or evaluating agentic systems that write or modify code, your eval suite needs tasks that reward restraint and penalize unnecessary complexity, not just tasks that reward correctness. A benchmark that only asks whether the code works is not asking enough. Senior SWE-Bench is asking more, and that is exactly what the field needs right now."
+      }
+    ]
+  }
+]

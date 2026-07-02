@@ -211,5 +211,113 @@
         "text": "Start thinking about this now, before your production agent quietly drains a budget at 3am because nobody wrote the handler."
       }
     ]
+  },
+  {
+    "slug": "sony-deletes-551-movies-digital-ownership-lie",
+    "title": "Sony Deletes 551 Movies and Accidentally Teaches a Systems Design Lesson",
+    "dek": "When a licensing deal between Sony and StudioCanal expired, 551 paid-for movies vanished from PlayStation libraries. Your users' data living inside a third-party platform is one contract expiry away from the same fate.",
+    "date": "2026-07-02",
+    "readMins": 6,
+    "category": "System Design",
+    "accent": "#7fe7ff",
+    "featured": false,
+    "excerpt": "Sony just deleted 551 movies people paid for. Engineers should not be surprised — because every product built on top of third-party infrastructure carries the exact same structural risk, and most teams find out the hard way.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "A licensing deal between Sony and StudioCanal expired quietly, the way these deals always do — somewhere in a legal department, on a calendar no customer ever had visibility into. What followed was not quiet at all: 551 movies that PlayStation users had purchased simply vanished from their libraries. No restore path, no meaningful compensation, no recourse. The story made the rounds as a consumer outrage piece, and that framing is correct but incomplete. Strip away the PlayStation branding and the movie titles and what you have left is a systems trust failure — one that is structurally identical to failures happening right now inside software products that engineers like you and me are shipping."
+      },
+      {
+        "t": "p",
+        "text": "The thing worth sitting with is this: those users genuinely believed they had bought something. They had the receipts. They had the transaction confirmations. The word 'purchase' appeared on the checkout flow. But what they actually acquired was a license to access content hosted on infrastructure owned and operated by a chain of commercial relationships they were never told about. The moment one link in that chain — a licensing agreement between two corporations — broke, the access evaporated. The payment was real. The ownership was a polite fiction."
+      },
+      {
+        "t": "p",
+        "text": "I am not writing this to moralize about consumer digital rights, though that conversation is worth having separately. I am writing this because the same architecture governs nearly every software product built on third-party infrastructure today, and most engineering teams have not designed for the moment when the upstream deal breaks."
+      },
+      {
+        "t": "h2",
+        "text": "The Lease You Signed Without Reading It"
+      },
+      {
+        "t": "p",
+        "text": "When you integrate an LLM provider's API into a production system, you are not buying a capability. You are leasing access to a model version, at a rate limit, with an output contract, all of which the provider can change with a changelog entry and a deprecation notice. The model your evals were tuned against gets sunset. The token pricing doubles. The response schema for function calling shifts in a way that is technically backward-compatible but practically breaks your parsing logic. You find out when your users start filing bug reports, not when the decision was made."
+      },
+      {
+        "t": "p",
+        "text": "The same dynamic plays out across every category of third-party dependency. You store user data in a managed platform and the vendor gets acquired, the product gets sunsetted, or the pricing tier your business was built around disappears. You depend on a cloud provider's SLA only to discover, at the worst possible moment, that the SLA covers uptime availability — not data continuity, not migration assistance, not the specific service behavior your application assumes. You license a third-party dataset for a retrieval-augmented generation pipeline and the data provider revokes access mid-production because their own upstream licensing situation changed."
+      },
+      {
+        "t": "p",
+        "text": "The pattern is identical every single time. Paid for only ever meant licensed access to, and access has an expiry date you did not set, governed by a contract you did not sign, enforced at a moment you cannot predict."
+      },
+      {
+        "t": "h2",
+        "text": "How to Actually Engineer for This"
+      },
+      {
+        "t": "p",
+        "text": "The engineering response is not to avoid third-party infrastructure — that ship sailed a long time ago and the productivity tradeoff is not worth it. The response is to treat every third-party dependency as a failure domain rather than a guarantee, and to build with that assumption present in the architecture from day one, not bolted on after the first incident."
+      },
+      {
+        "t": "p",
+        "text": "The first concrete practice is building egress paths before you need them. If your users' data lives inside a vendor's platform, you should be able to snapshot and export it on a schedule you control. This is not a backup conversation — it is a data sovereignty conversation. The question to ask is not 'can we get our data out if something goes wrong' but 'are we running exports right now, regularly, into storage we own, in a format we can actually use.' For most teams the honest answer is no, and the time to fix that is before the vendor sends the migration notice."
+      },
+      {
+        "t": "code",
+        "code": "# A bare-minimum nightly export pattern — swap in your actual vendor CLI or API client\n# The point is that this runs on YOUR scheduler, writes to YOUR storage, in YOUR format\n\n#!/bin/bash\nEXPORT_DATE=$(date +%Y-%m-%d)\nVENDOR_CLI export \\\n  --format jsonl \\\n  --output ./snapshots/user-data-${EXPORT_DATE}.jsonl\n\naws s3 cp ./snapshots/user-data-${EXPORT_DATE}.jsonl \\\n  s3://your-own-bucket/snapshots/user-data-${EXPORT_DATE}.jsonl\n\necho \"Export complete: ${EXPORT_DATE}\"",
+        "lang": "bash"
+      },
+      {
+        "t": "p",
+        "text": "The second practice is abstracting your provider layer early. If your application code calls OpenAI's client SDK directly in forty different places, swapping providers is not a configuration change — it is a rewrite. The fix is a thin adapter interface that your application code talks to, with the actual provider implementation sitting behind it. This is not over-engineering. This is acknowledging that the provider landscape for LLMs, for managed databases, for third-party APIs of every kind, is unstable and that your ability to move is a business continuity property."
+      },
+      {
+        "t": "ul",
+        "items": [
+          "Define a provider interface your application code depends on — not a concrete SDK class",
+          "Implement the interface once per provider: OpenAI, Anthropic, a local model, whatever you need",
+          "Keep provider-specific logic — retry strategies, rate limit handling, response normalization — inside the implementation, not scattered across callers",
+          "Write your evals and integration tests against the interface, not the provider, so they survive a swap"
+        ]
+      },
+      {
+        "t": "p",
+        "text": "The third practice is the one teams skip most consistently: reading the data retention and termination clauses before you are in production. Most vendor contracts are clear about what happens to your data when you cancel, when you are delinquent on payment, or when the service is discontinued. The problem is that these clauses live in legal documents that engineers rarely read and product managers rarely escalate. Making this a part of the vendor evaluation process — not as a checkbox but as an actual technical risk assessment — is the difference between finding out in a planning meeting and finding out from a user."
+      },
+      {
+        "t": "callout",
+        "text": "If this vendor ceases to operate or terminates our account tomorrow, what exactly happens to our data, our users' data, and the runtime behavior our product depends on? What is the export format, what is the notice period, and what is the migration path? If you cannot answer this before signing, you are accepting a risk your users will pay for.",
+        "label": "The question to add to every vendor review"
+      },
+      {
+        "t": "h2",
+        "text": "The Responsibility That Transfers to You"
+      },
+      {
+        "t": "p",
+        "text": "The PlayStation users who lost their movies had no leverage. They were end consumers inside a commercial ecosystem with no ability to snapshot the films they had paid for, no way to abstract the PlayStation runtime, no visibility into the StudioCanal licensing calendar. They were entirely dependent on Sony to have designed the system in a way that protected them, and Sony did not. That is a real failure and it belongs to Sony."
+      },
+      {
+        "t": "p",
+        "text": "Your users are in the same position relative to you. They cannot see which LLM provider you are calling, which managed database holds their records, which third-party dataset powers your recommendations. They have no ability to export their data independently or route around a vendor failure. They are trusting you to have designed the system in a way that does not put them in the position those PlayStation users are in right now."
+      },
+      {
+        "t": "p",
+        "text": "That trust is not abstract. It is load-bearing. The engineering work of treating dependencies as failure domains, building egress paths, abstracting provider layers, and actually reading the termination clauses is not defensive programming in the pejorative sense. It is the work of being worthy of the trust your users extend every time they put their data into something you built."
+      },
+      {
+        "t": "h2",
+        "text": "The Takeaway"
+      },
+      {
+        "t": "p",
+        "text": "Sony did not set out to delete 551 movies from people's libraries. The mechanism was a commercial contract expiry that propagated down into user experience with no mitigation layer in between. The lesson is not that Sony is uniquely malicious. The lesson is that commercial contract expiries, vendor deprecations, acquisitions, and sunsets happen constantly across the infrastructure landscape every software product depends on — and the teams that survive them are the ones that designed for the possibility before it became a reality."
+      },
+      {
+        "t": "p",
+        "text": "You paid for it means nothing without ownership of the underlying data or runtime. Build like you know that."
+      }
+    ]
   }
 ]

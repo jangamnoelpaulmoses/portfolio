@@ -926,5 +926,98 @@
       }
     ],
     "cover": "/journal-images/model-training-as-code-aleph-alpha/hero.png"
+  },
+  {
+    "slug": "lore-coding-agent-team-decisions-memory",
+    "title": "Give Your Coding Agent the Decisions Your Team Made",
+    "dek": "Lore surfaces a real production gap: coding agents are stateless by default, and that statelessness will confidently undo your best architectural choices. Here's the engineering pattern that fixes it.",
+    "date": "2026-07-02",
+    "readMins": 5,
+    "category": "Agentic AI",
+    "accent": "#7c5cff",
+    "featured": false,
+    "excerpt": "Coding agents see your files. They don't see your reasoning. That gap is why an agent will swap your event-driven design for polling, re-introduce a dependency you explicitly ripped out, or contradict a security call made after a real incident. None of it is the model's fault — it has no signal that a decision was deliberate.",
+    "content": [
+      {
+        "t": "image",
+        "src": "/journal-images/lore-coding-agent-team-decisions-memory/hero.png",
+        "alt": "Give Your Coding Agent the Decisions Your Team Made"
+      },
+      {
+        "t": "lead",
+        "text": "A project called Lore appeared on Hacker News with a pitch that is almost uncomfortably simple: give your coding agent the decisions your team already made. The repo is github.com/itsthelore/rac-core, and the moment I read the description I felt that particular kind of recognition you get when someone names a problem you have been quietly losing time to. Coding agents are stateless by default. That is not a bug in any individual tool — it is an architectural reality of how every session is constructed. And it is, right now, one of the sharpest edges in production agentic development."
+      },
+      {
+        "t": "h2",
+        "text": "The Statelessness Problem Is Not About Hallucination"
+      },
+      {
+        "t": "p",
+        "text": "When people say their coding agent made a weird or wrong change, the instinct is to blame the model. But most of the time the model is doing exactly what a competent engineer would do if you handed them the codebase with zero context about its history. It sees polling and event-driven logic coexisting in adjacent files and picks the simpler-looking one. It spots a library in an old branch and helpfully reintroduces it, unaware you spent two weeks ripping it out because of a licensing conflict. It restructures an auth flow without knowing that the current shape was the result of a post-incident review."
+      },
+      {
+        "t": "p",
+        "text": "These are not hallucinations. Hallucination is the model fabricating facts that do not exist. This is something structurally different: the model reasoning competently over incomplete context and arriving at a locally coherent but globally wrong answer. The distinction matters because the fix is also different. You do not need a better model. You need better context."
+      },
+      {
+        "t": "h2",
+        "text": "The Architecture: RAG for Institutional Memory"
+      },
+      {
+        "t": "p",
+        "text": "The pattern Lore is pushing is retrieval-augmented generation applied not to documentation or codebases but to the decision log of a team. If you have built RAG for a knowledge base, the mechanics are familiar. The novel part is the source material and the discipline required to produce it. Let me walk through the four layers as I would think about them in a real system."
+      },
+      {
+        "t": "p",
+        "text": "The capture layer is where most teams will fail first. You need decisions in a structured, retrievable form. That means Architecture Decision Records written as markdown files versioned in the repo, PR descriptions that actually explain the why rather than the what, and any significant calls recorded in Notion or Confluence exported and normalized. The format matters less than the habit. A flat JSON object with fields for context, decision, consequences, and domain tags is enough to get started."
+      },
+      {
+        "t": "code",
+        "code": "{\n  \"id\": \"adr-0042\",\n  \"title\": \"Use event-driven messaging over polling for order state changes\",\n  \"status\": \"accepted\",\n  \"domain\": [\"orders\", \"infra\"],\n  \"context\": \"Polling the orders table every 5s was causing lock contention at peak load.\",\n  \"decision\": \"Publish state change events to an internal message bus. Consumers subscribe per domain.\",\n  \"consequences\": \"Eventual consistency in downstream reads. Polling-based consumers must be migrated.\",\n  \"do_not_revert_because\": \"Lock contention issue is still present. Polling will not scale past current traffic.\"\n}",
+        "lang": "json"
+      },
+      {
+        "t": "p",
+        "text": "The retrieval layer embeds those decision records and performs semantic search at the start of each agent session or tool call. When the agent is about to touch the orders module, you retrieve the top-k decisions tagged to that domain or semantically similar to the task description, then inject them into context before the agent generates any code. The embedding and retrieval can be done with any standard vector store. The query is usually a combination of the file paths in scope and a short natural language description of the task."
+      },
+      {
+        "t": "p",
+        "text": "The injection layer prepends the retrieved decisions to the system prompt or, if the agent supports it, passes them as a structured tool response before code generation begins. This is where the framing matters. You are not dumping raw ADRs at the model. You are presenting them as authoritative constraints: these are decisions this team has already made, do not reverse them without explicit instruction. That framing changes how the model weighs the retrieved context against its priors."
+      },
+      {
+        "t": "p",
+        "text": "The scope control layer keeps retrieval precise. Tagging decisions by domain — auth, infra, API contracts, data models — means a task touching the payments module does not drown in decisions about the notification service. Noisy retrieval is its own failure mode. If every session dumps thirty irrelevant ADRs into context, engineers will stop writing decisions down because they will see no effect on agent behavior."
+      },
+      {
+        "t": "h2",
+        "text": "What Makes This Hard in Practice"
+      },
+      {
+        "t": "callout",
+        "text": "The hard part of this system is not the retrieval pipeline. Embedding documents and running semantic search is a solved problem with well-understood tooling. The hard part is the discipline to write decisions down at the moment they are made, with enough context that a retrieval system can surface them usefully six months later.",
+        "label": "The Real Constraint"
+      },
+      {
+        "t": "p",
+        "text": "Most teams have an implicit decision log that lives in the heads of two or three senior engineers. It works until one of them leaves, or until an agent joins the codebase. Agents cannot ask clarifying questions the way a new hire would. They will not flag uncertainty about whether a pattern is intentional. They will just act. The cost of undocumented decisions goes up significantly when agents are in the loop."
+      },
+      {
+        "t": "p",
+        "text": "There is also a retrieval quality problem worth taking seriously. Semantic search over decision logs is imprecise enough that you will sometimes surface irrelevant decisions and miss critical ones. Hybrid retrieval — combining embedding similarity with keyword matching on domain tags and affected file paths — tends to perform better than pure semantic search for this use case. It is worth investing in the tagging schema early, because retrofitting structure onto a large decision log is painful."
+      },
+      {
+        "t": "h2",
+        "text": "The Engineering Takeaway"
+      },
+      {
+        "t": "p",
+        "text": "If you are building with coding agents today — Claude Code, Cursor, Copilot, or anything downstream of a code-generation model — the question to ask is not whether the model is good enough. It probably is. The question is whether you have given it the context it needs to make decisions that align with your system's history. Statelessness is the default. Persistent institutional context is something you have to engineer."
+      },
+      {
+        "t": "p",
+        "text": "Lore is an early implementation of a pattern that I expect to become standard in any serious agentic development workflow. The capture and retrieval mechanics are not complex. The cultural shift — treating architectural decisions as first-class engineering artifacts that belong in the repo alongside the code they govern — is the actual work. Start there. The retrieval pipeline will be the easy part."
+      }
+    ],
+    "cover": "/journal-images/lore-coding-agent-team-decisions-memory/hero.png"
   }
 ]

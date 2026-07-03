@@ -1019,5 +1019,105 @@
       }
     ],
     "cover": "/journal-images/lore-coding-agent-team-decisions-memory/hero.png"
+  },
+  {
+    "slug": "claude-code-mri-second-opinion-agentic-boundaries",
+    "title": "Claude Code MRI Second Opinion — Agentic Boundaries",
+    "dek": "When a coding agent walks someone through their MRI findings and gets 535 Hacker News comments, that is not a curiosity. That is a forcing function for every builder working on agentic systems.",
+    "date": "2026-07-02",
+    "readMins": 5,
+    "category": "Agentic AI",
+    "accent": "#7c5cff",
+    "featured": false,
+    "excerpt": "Someone fed their MRI to Claude Code — a coding agent — and came away feeling like they had a genuine second opinion. The HN thread blew up for good reason. This moment exposes something most teams building agentic systems have not yet reckoned with: the label on the box is not a capability ceiling, and without deliberate architectural guardrails, your agent will wander into domains you never tested, with stakes you never modeled.",
+    "content": [
+      {
+        "t": "image",
+        "src": "/journal-images/claude-code-mri-second-opinion-agentic-boundaries/hero.png",
+        "alt": "Claude Code MRI Second Opinion — Agentic Boundaries"
+      },
+      {
+        "t": "lead",
+        "text": "Someone fed their MRI to Claude Code — a tool built to read codebases, write diffs, and run shell commands — walked through the findings in a long iterative session, and came away feeling like they had received a genuine second opinion. The post landed 411 points and 535 comments on Hacker News. That volume is not noise. It is a signal about where agentic AI is right now, and more importantly, where most teams building on top of it are not."
+      },
+      {
+        "t": "h2",
+        "text": "The Label on the Box Is a UX Layer, Not a Capability Ceiling"
+      },
+      {
+        "t": "p",
+        "text": "Claude Code is marketed and scaffolded as a coding agent. Its defaults lean toward repository traversal, shell execution, and diff generation. But when you hand any capable LLM a long context window, a tool-use scaffold, and the ability to reason step-by-step across modalities, you have not built a coding tool. You have built a general reasoning engine wearing a coding tool's jacket."
+      },
+      {
+        "t": "p",
+        "text": "The MRI session works architecturally for the same reason a RAG pipeline over legal documents works: image bytes get tokenized or described, text context accumulates across turns, the model issues clarifying questions, and the loop tightens iteratively toward an answer. That pattern is domain-agnostic. The primitives — multimodal input, extended context, chain-of-thought, tool invocation — do not care whether the artifact under analysis is a TypeScript monorepo or a T2-weighted brain scan. The scaffold is the same. The stakes are not."
+      },
+      {
+        "t": "h2",
+        "text": "Where the Agentic Loop Actually Lives"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/claude-code-mri-second-opinion-agentic-boundaries/1.png",
+        "alt": "Where the Agentic Loop Actually Lives"
+      },
+      {
+        "t": "p",
+        "text": "It helps to be precise about what an agentic loop is at the mechanical level. At its core it is a while loop: the model observes state, picks an action, executes it via a tool or produces text, updates context, and repeats until a stopping condition is met. In a coding agent the actions are things like reading a file, running a test suite, or writing a patch. But nothing in that loop specification constrains the domain. The constraint is only what tools you expose and what system prompt you set."
+      },
+      {
+        "t": "code",
+        "code": "while not done:\n    observation = get_current_context()   # file tree, scan image, legal doc — same call\n    action = model.decide(observation)    # model does not know your intended domain\n    result = tool_executor.run(action)    # only constrained by tools you registered\n    context.append(result)",
+        "lang": "python"
+      },
+      {
+        "t": "p",
+        "text": "This is not a flaw. Generality is the product. But it means the domain wall you think you have drawn in your product spec does not exist at the loop level. Users will find the edge, and they will push through it, because the model will respond helpfully rather than refuse. That is the behavior you trained for."
+      },
+      {
+        "t": "h2",
+        "text": "Hallucination Risk Changes Category at Domain Boundaries"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/claude-code-mri-second-opinion-agentic-boundaries/2.png",
+        "alt": "Hallucination Risk Changes Category at Domain Boundaries"
+      },
+      {
+        "t": "p",
+        "text": "In a software context, a hallucinated function signature or a fabricated API method is annoying and correctable. You run the tests. The stack trace tells you what is wrong. The feedback loop is tight and the cost of failure is low. In a medical imaging context, a confident-sounding miss — a finding described with appropriate hedging language that nonetheless points the reader in the wrong direction — belongs to a different failure category entirely. The feedback loop is slow, the reader may lack the expertise to calibrate the model's confidence, and the downstream action could be a real clinical decision."
+      },
+      {
+        "t": "p",
+        "text": "The problem is not that the model is uniquely bad at medical reasoning. The problem is that our standard eval pipelines were never designed to catch this boundary case. We measure pass-at-k on coding benchmarks. We measure retrieval precision on document QA. We do not have robust runtime evals that fire when an agent session drifts into an unintended domain mid-conversation. That gap is now a product risk, not just a research problem."
+      },
+      {
+        "t": "callout",
+        "text": "Scope creep at runtime is not a user education problem. Users will always push agents into adjacent domains. If your system has no mechanism to detect that drift and adjust behavior accordingly, your safety assumptions are built on a prompt you wrote once and never tested at the boundary.",
+        "label": "Engineering Reality"
+      },
+      {
+        "t": "h2",
+        "text": "Engineering the Domain Wall You Do Not Get for Free"
+      },
+      {
+        "t": "p",
+        "text": "The architectural implication is straightforward to state and genuinely hard to implement well. You have to engineer the boundary deliberately because nothing in the underlying scaffold enforces it for you. In practice this means a few concrete things."
+      },
+      {
+        "t": "ul",
+        "items": [
+          "Session-level intent classification: run a lightweight classifier or a cheap model call at the start of each session and periodically mid-session to detect domain drift. If a coding agent session pivots toward medical, legal, or financial advice, that should be a detectable signal, not a silent pass-through.",
+          "Tool surface restriction: the tools you expose are the sharpest domain constraint available to you. A coding agent that cannot call out to medical imaging APIs or does not receive DICOM input as a registered tool type has a narrower blast radius, even if the underlying model is still willing to reason over images described in text.",
+          "Confidence and disclaimer injection: for high-stakes domain drift, a system prompt instruction to surface uncertainty and direct users to qualified professionals is imperfect but not worthless. It changes the epistemic frame the model presents its output in.",
+          "Evals at the domain boundary: write test cases that explicitly probe whether your agent will helpfully wander into medical, legal, or financial reasoning when given an opening. If you have never run those evals, you do not know what your system actually does."
+        ]
+      },
+      {
+        "t": "p",
+        "text": "None of this is a reason to slow down on building agentic systems. The MRI story is also a story about genuine utility — someone in an uncertain medical situation felt more informed after the session, and the post was honest about the limitations. That is real value. The engineering takeaway is not that general-purpose agentic scaffolding is dangerous and should be locked down. It is that the domain boundary is your responsibility to define and enforce, because the model will not do it for you, and your users will not do it either. Design for the runtime behavior you actually get, not the use case you intended."
+      }
+    ],
+    "cover": "/journal-images/claude-code-mri-second-opinion-agentic-boundaries/hero.png"
   }
 ]

@@ -841,5 +841,90 @@
         "text": "The shift in mental model is from context as a resource to be maximized to context as a resource to be curated. That shift has downstream effects on every part of the agent stack: how you store intermediate state, how you structure tool definitions, how you write retrieval queries, how you design your summarization prompts, and how you measure success. Getting it right is what separates an agent that works in a demo from one that works in production at scale."
       }
     ]
+  },
+  {
+    "slug": "model-training-as-code-aleph-alpha",
+    "title": "Model Training as Code: The Reliability Gap Nobody Talks About",
+    "dek": "Aleph Alpha's case for treating training pipelines with the same rigor as infrastructure-as-code exposes a quiet but serious engineering debt in most ML teams.",
+    "date": "2026-07-02",
+    "readMins": 4,
+    "category": "System Design",
+    "accent": "#7fe7ff",
+    "featured": false,
+    "excerpt": "Most ML teams version their infrastructure with Terraform and their application code with Git, then turn around and run model training from a Jupyter notebook someone last touched six months ago. That gap is not a workflow preference — it is a structural reliability problem.",
+    "content": [
+      {
+        "t": "image",
+        "src": "/journal-images/model-training-as-code-aleph-alpha/hero.png",
+        "alt": "Model Training as Code: The Reliability Gap Nobody Talks About"
+      },
+      {
+        "t": "lead",
+        "text": "Most ML teams version their infrastructure with Terraform and their application code with Git, then turn around and run model training from a Jupyter notebook someone last touched six months ago. That gap is not a workflow preference — it is a structural reliability problem, and Aleph Alpha recently put a name to the fix: Model Training as Code."
+      },
+      {
+        "t": "p",
+        "text": "The analogy to infrastructure-as-code is precise, not decorative. Before tools like Terraform became standard, infrastructure was provisioned by logging into servers and running commands. It worked until it did not, and when it did not, reproducing the original environment was an archaeology project. The same dynamic is playing out in ML today, just one abstraction layer up. Training pipelines live in bash scripts assembled over months, YAML configs that accumulated undocumented edits, and experiment trackers full of runs that cannot be re-triggered from scratch. The model in production is an artifact of a process nobody can fully reconstruct."
+      },
+      {
+        "t": "h2",
+        "text": "What the Problem Actually Looks Like"
+      },
+      {
+        "t": "p",
+        "text": "The failure mode is not dramatic. Nobody's training loop crashes in a way that pages at 3am. Instead, the damage is cumulative and subtle. A data loader gets patched inline without updating the experiment config. A seed gets hardcoded in one place and left floating in another. An evaluation script drifts from the training script because they live in different repositories maintained by different people. The production model and the eval run that approved it quietly diverge. When a regression appears three model versions later, nobody can answer which change caused it because no single artifact describes the complete training state at any prior point."
+      },
+      {
+        "t": "p",
+        "text": "This is not a hypothetical. It is the default state for teams that have not deliberately engineered their training pipelines as software. The question is what the engineered alternative actually looks like in practice."
+      },
+      {
+        "t": "h2",
+        "text": "The Core Mechanics of Training as Code"
+      },
+      {
+        "t": "p",
+        "text": "The first and most load-bearing principle is co-versioning: hyperparameters, data pipeline specifications, architecture definitions, and preprocessing logic must live in the same Git repository and move through the same commit history as the model code itself. Not a separate config repo, not a spreadsheet of experiment notes, not a wandb run description. When you check out a commit, you should be able to reconstruct exactly what was trained and why."
+      },
+      {
+        "t": "p",
+        "text": "Reproducibility by default is the second requirement. This means locking random seeds, pinning data split indices or snapshot hashes, and capturing the full environment — Python version, library versions, hardware configuration — as a versioned artifact. A common pattern is to serialize the resolved environment at the start of every run and store it alongside model weights."
+      },
+      {
+        "t": "code",
+        "code": "# Capture the full dependency state at training time\npip freeze > artifacts/run_$(git rev-parse --short HEAD)/requirements.lock\n\n# Pin the data snapshot by content hash, not by mutable path\nDATA_HASH=$(sha256sum data/train.parquet | awk '{print $1}')\necho $DATA_HASH > artifacts/run_$(git rev-parse --short HEAD)/data.lock",
+        "lang": "bash"
+      },
+      {
+        "t": "p",
+        "text": "The third principle is modularity. A 1,200-line training monolith is untestable by definition. When ingestion, preprocessing, training, and evaluation are separate composable stages with defined interfaces, each stage can be unit-tested in isolation and swapped without touching the others. A change to the data loader does not require understanding the gradient accumulation logic. A new evaluation metric does not require touching the checkpoint serialization code."
+      },
+      {
+        "t": "p",
+        "text": "The fourth principle — and the one that ties the others together operationally — is CI/CD for training. A pull request that modifies a loss function, a data augmentation step, or a tokenization strategy should automatically trigger a validation training run against a held-out data slice, comparing key metrics against the baseline before the PR can merge. This is not exotic. It is the same contract that application engineers already apply to every code change they ship."
+      },
+      {
+        "t": "h2",
+        "text": "Where Declarative Experiment Definitions Fit"
+      },
+      {
+        "t": "p",
+        "text": "One of the less obvious implications of treating training as code is that experiment definitions should be declarative rather than imperative. Instead of a script that manually calls each stage in sequence, you define what a training run consists of — data source, architecture config, optimizer parameters, evaluation criteria — and a runner resolves and executes the dependency graph. Tools in the MLOps ecosystem already support this pattern. The practical benefit is that you can diff two experiment definitions the same way you diff two Terraform plans: before you run anything, you can see exactly what changed and what did not."
+      },
+      {
+        "t": "callout",
+        "text": "If someone on your team left tomorrow, could any other engineer re-run last month's training job and get the same model weights? If the honest answer is no, that is the gap Model Training as Code is designed to close. Start by co-versioning your configs with your model code in Git. Everything else builds from there.",
+        "label": "Engineering Takeaway"
+      },
+      {
+        "t": "h2",
+        "text": "Why This Takes Time to Become Standard"
+      },
+      {
+        "t": "p",
+        "text": "Infrastructure-as-code did not become the default in a year. It took a decade of production incidents, team turnover, and accumulated pain before Terraform became table stakes for any serious engineering org. The same trajectory is ahead for training pipelines, but ML teams are arguably on an accelerated timeline because the pressure from production deployments is arriving faster than it did for general infrastructure. Teams shipping models at scale — where a regression in a production model has real downstream consequences — are already living these practices. The teams still running training like it is 2018 will get there through necessity, not enthusiasm. The argument for moving sooner is simply that the debugging, onboarding, and auditing costs compound quietly for every month the structural debt is left in place."
+      }
+    ],
+    "cover": "/journal-images/model-training-as-code-aleph-alpha/hero.png"
   }
 ]

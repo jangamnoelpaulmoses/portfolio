@@ -206,6 +206,15 @@ export const experience = [
 
 export const projects = [
   {
+    title: 'DeskTrack: Screen-Aware Productivity Tracker',
+    year: '2026',
+    tags: ['Electron', 'AI Vision', 'macOS'],
+    image: '/projects/desktrack.jpg',
+    link: 'https://github.com/jangamnoelpaulmoses/desktrack',
+    blurb:
+      'A Mac app that understands your day by watching your screen. No integrations to connect. It builds your timeline, spots tasks, nudges you when you drift, and writes a review of your evening. Works with OpenAI, a fully local model, or no AI at all.',
+  },
+  {
     title: 'BrainOS — Knowledge Layer for AI Agents',
     year: '2026',
     tags: ['Knowledge Graph', 'vLLM', 'Multi-Agent'],

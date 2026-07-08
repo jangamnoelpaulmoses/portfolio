@@ -17,6 +17,68 @@ export const blogMeta = {
 
 const handWritten = [
   {
+    slug: 'building-desktrack',
+    title: 'I Built a Mac App That Tracks My Day by Watching the Screen',
+    dek: 'Every productivity tracker wants you to connect Slack, Notion, and your email first. DeskTrack skips all of that. It looks at the screen the way you do and figures the rest out.',
+    date: '2026-07-07',
+    readMins: 4,
+    category: 'Shipping',
+    accent: '#3987e5',
+    featured: false,
+    cover: '/journal/desktrack-dashboard.jpg',
+    excerpt:
+      'The screen is the one integration every app already supports. I built a tracker around that idea, shipped it as a DMG, and learned more about macOS in two days than in two years.',
+    content: [
+      {
+        t: 'lead',
+        text: 'Routine trackers all share the same first screen: connect your calendar, connect Slack, connect Notion, paste three API keys. I wanted the opposite. DeskTrack watches the screen itself, so every app is supported on day one, including the ones with no API at all.',
+      },
+      { t: 'image', src: '/journal/desktrack-dashboard.jpg', alt: 'DeskTrack dashboard with focus stats, time by category, tasks, and a timeline' },
+      { t: 'h2', text: 'What it does' },
+      {
+        t: 'ul',
+        items: [
+          'Builds a timeline of your day, grouped into clean sessions.',
+          'Scores your focus and shows where the hours actually went.',
+          'Spots tasks sitting on your screen, like a todo in Notes or an email waiting for a reply.',
+          'Nudges you when you drift into entertainment for too long.',
+          'Writes a short review of your day every evening: wins, leaks, and what to try tomorrow.',
+        ],
+      },
+      { t: 'image', src: '/journal/desktrack-timeline.jpg', alt: 'DeskTrack timeline showing focus and drift entries with app names and summaries' },
+      { t: 'h2', text: 'How it stays cheap and private' },
+      {
+        t: 'p',
+        text: 'The trick is separating watching from understanding. Watching is free: every few seconds the app takes a tiny local fingerprint of the screen and listens for app switches through a small Swift helper. Understanding costs money, so the AI only sees a screenshot when something meaningfully changed. A full day of tracking costs a few cents.',
+      },
+      {
+        t: 'callout',
+        label: 'Privacy first',
+        text: 'Screenshots are analyzed and thrown away, never stored. All data stays on the Mac. There is a fully local mode powered by Ollama and a no-AI mode that tracks by app name alone.',
+      },
+      { t: 'image', src: '/journal/desktrack-tiles.jpg', alt: 'DeskTrack stat tiles showing time tracked, focus percent, context switches, and longest focus block' },
+      { t: 'h2', text: 'What shipping it taught me' },
+      {
+        t: 'ul',
+        items: [
+          'macOS ties screen permissions to the exact app signature. Rebuild the app and the permission silently dies. The fix was trusting real capture results instead of the permission API.',
+          'Unsigned apps downloaded from the internet show a scary "damaged" error unless you sign them properly, even with a throwaway signature. Found that one by testing as a fresh user.',
+          'My router corrupts large uploads over IPv6. Every git push of the installers failed until I forced IPv4. The error had nothing to do with git.',
+          'The best test plan is pretending you are a stranger who just downloaded the app.',
+        ],
+      },
+      {
+        t: 'p',
+        text: 'DeskTrack is free to download for macOS, with the build and install steps documented in the repo. If you try it, I would love to hear what it gets wrong about your day.',
+      },
+      {
+        t: 'callout',
+        label: 'Try it',
+        text: 'Download DeskTrack for Mac at github.com/jangamnoelpaulmoses/desktrack. Bring an OpenAI key, run it fully local, or skip AI entirely.',
+      },
+    ],
+  },
+  {
     slug: 'loop-engineering',
     title: 'Loop Engineering: Stop Prompting, Start Delegating',
     dek: 'The shift from chatting with AI to deploying it as a worker that runs while you walk away — and the one rule that separates a useful loop from a disaster.',

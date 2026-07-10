@@ -1119,5 +1119,116 @@
       }
     ],
     "cover": "/journal-images/claude-code-mri-second-opinion-agentic-boundaries/hero.png"
+  },
+  {
+    "slug": "luks-suspend-key-wipe-regression-linux69",
+    "title": "LUKS Suspend Stopped Wiping Keys in Linux 6.9 — And Nobody Told You",
+    "dek": "A silent kernel regression since Linux 6.9 means LUKS suspend no longer scrubs disk-encryption keys from memory. Here is what that breaks, why it slipped through, and what you should do about it.",
+    "date": "2026-07-09",
+    "readMins": 4,
+    "category": "Security",
+    "accent": "#ff4d6d",
+    "featured": false,
+    "excerpt": "Full-disk encryption with LUKS is supposed to scrub your disk-encryption keys from RAM the moment you suspend. Since Linux 6.9, that scrub quietly stopped happening — no error, no warning, no log entry. Just keys sitting in memory, waiting.",
+    "content": [
+      {
+        "t": "image",
+        "src": "/journal-images/luks-suspend-key-wipe-regression-linux69/hero.png",
+        "alt": "LUKS Suspend Stopped Wiping Keys in Linux 6.9 — And Nobody Told You"
+      },
+      {
+        "t": "lead",
+        "text": "Full-disk encryption with LUKS is supposed to scrub your disk-encryption keys from RAM the moment you suspend. Since Linux 6.9, that scrub quietly stopped happening — no error, no warning, no log entry. Just keys sitting in memory, waiting. If you upgraded past 6.9 and never audited your suspend behavior, you have been operating under a threat model that the kernel silently broke."
+      },
+      {
+        "t": "h2",
+        "text": "What LUKS Suspend Is Actually Supposed to Do"
+      },
+      {
+        "t": "p",
+        "text": "LUKS — the Linux Unified Key Setup — sits on top of the dm-crypt kernel module. When you unlock a LUKS volume, the derived encryption key lives in the kernel keyring and gets handed to dm-crypt, which uses it to encrypt and decrypt block I/O transparently. That key is plaintext in kernel memory for as long as the volume is open."
+      },
+      {
+        "t": "p",
+        "text": "The luks-suspend mechanism exists precisely to close that window during suspend. When you invoke it — either directly or through a hook in your suspend pipeline — it is supposed to freeze all processes, flush pending I/O, hand the encryption key back, scrub it from memory, and only then let the system enter the suspend state. On resume, you re-enter your passphrase, the key is re-derived, and the volume unlocks again. The guarantee is simple: a suspended machine should be cryptographically equivalent to a powered-off one."
+      },
+      {
+        "t": "p",
+        "text": "Since Linux 6.9, that guarantee is gone. The suspend path proceeds, but the key wipe does not happen. The system suspends with the keys resident in RAM, silently."
+      },
+      {
+        "t": "h2",
+        "text": "Why Leaving Keys in RAM Is Not a Theoretical Problem"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/luks-suspend-key-wipe-regression-linux69/1.png",
+        "alt": "Why Leaving Keys in RAM Is Not a Theoretical Problem"
+      },
+      {
+        "t": "p",
+        "text": "Two concrete attack classes make this matter in practice, not just on paper."
+      },
+      {
+        "t": "p",
+        "text": "The first is cold boot attack. DRAM is not instantly volatile. At room temperature, contents can persist for seconds to several minutes after power is cut. Cooling the modules — even with a can of compressed air held inverted — extends retention significantly. An attacker who can briefly access a suspended or freshly powered-off machine, remove the DIMMs, and move them to a tool that dumps their contents can recover keys that were never scrubbed. This technique is well-documented in academic literature and has been demonstrated against full-disk encryption systems in practice."
+      },
+      {
+        "t": "p",
+        "text": "The second is direct memory access via Thunderbolt or PCIe. DMA-capable interfaces can read arbitrary physical memory without CPU involvement and without rebooting the machine at all. A device plugged into a Thunderbolt port on a suspended laptop can, absent IOMMU protections, sweep memory and pull key material. IOMMU helps, but configuration is not uniform across distributions and hardware, and it does not protect you if the machine is left in a state where keys were supposed to be gone but were not."
+      },
+      {
+        "t": "p",
+        "text": "Suspend-to-RAM is the default sleep state on most Linux laptops and on many server configurations. This is not an edge case. S3 is the path every engineer hits when they close the lid or step away from a machine."
+      },
+      {
+        "t": "h2",
+        "text": "How to Check Your Exposure Right Now"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/luks-suspend-key-wipe-regression-linux69/2.png",
+        "alt": "How to Check Your Exposure Right Now"
+      },
+      {
+        "t": "p",
+        "text": "Start by confirming your kernel version and whether luks-suspend is even in your suspend pipeline."
+      },
+      {
+        "t": "code",
+        "code": "uname -r\n\n# Check if luks-suspend is installed\nwhich luks-suspend 2>/dev/null || echo \"luks-suspend not found\"\n\n# On systemd systems, inspect the suspend target hooks\nsystemctl cat systemd-suspend.service\n\n# List active dm-crypt devices\ndmsetup ls --target crypt\n\n# Inspect which keys are held in the kernel keyring\nkeyctl show @u",
+        "lang": "bash"
+      },
+      {
+        "t": "p",
+        "text": "If you are running a kernel at or above 6.9 and relying on luks-suspend for key wiping, you need to treat that wipe as unconfirmed until the regression is addressed upstream or patched in your distribution. Pinning to a kernel below 6.9 is one mitigation, though it trades one risk surface for others. The more conservative posture is to power the machine fully off rather than suspend it until you have confirmed the behavior on your specific kernel build."
+      },
+      {
+        "t": "callout",
+        "text": "Until this is fixed in your kernel, prefer full shutdown over suspend for machines handling sensitive data. If suspend is unavoidable, verify your IOMMU is enforcing, and treat physical access to a suspended machine as equivalent to full compromise.",
+        "label": "Mitigation"
+      },
+      {
+        "t": "h2",
+        "text": "The Deeper Engineering Failure: Security Properties Without Regression Tests"
+      },
+      {
+        "t": "p",
+        "text": "This regression is a systems engineering problem as much as a kernel bug. Security properties are behavioral invariants. They need to be tested with the same rigor as functional correctness — arguably more, because their failure is often invisible. A broken key-wipe does not produce an error code. dm-crypt keeps running. The system resumes normally. The only signal that something is wrong is the absence of a guarantee, and absence is hard to observe."
+      },
+      {
+        "t": "p",
+        "text": "Kernel CI does an excellent job catching boot failures, performance regressions, and driver breakage. It is far weaker at asserting that a specific memory region was zeroed before a power state transition. That class of property requires targeted tests that instrument the expected side effect — not just that the suspend succeeded, but that the key material is absent from memory afterward. Without that test, a refactor anywhere in the suspend call chain can silently drop the wipe and ship to millions of machines."
+      },
+      {
+        "t": "p",
+        "text": "The broader principle extends beyond the kernel. Any system that offers a security guarantee — token revocation, session invalidation, secret zeroing — needs a verification path that checks the guarantee was actually upheld, not just that the happy path returned success. Defense in depth only works when each layer is independently verified. When one layer quietly fails, the layers above it look fine from the outside. That is exactly what happened here: LUKS looks intact, dm-crypt is running, the disk is encrypted — and the keys are sitting in RAM."
+      },
+      {
+        "t": "p",
+        "text": "Check your kernel version. Verify your suspend behavior. Do not trust the abstraction."
+      }
+    ],
+    "cover": "/journal-images/luks-suspend-key-wipe-regression-linux69/hero.png"
   }
 ]

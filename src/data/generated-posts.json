@@ -1689,5 +1689,94 @@
         "text": "Pay attention to what serious builders reach for when they have a genuinely hard problem to solve. The tool choice is almost always an argument about tradeoffs, and that argument is usually more interesting than the tool itself."
       }
     ]
+  },
+  {
+    "slug": "john-deere-right-to-repair-software-lock-in",
+    "title": "John Deere, the FTC, and the Lock-In You Are Building Right Now",
+    "dek": "The right-to-repair settlement is not a farming story. It is a warning for every engineer who has ever designed an API, a firmware gate, or a proprietary data format and never once called it a control mechanism.",
+    "date": "2026-07-10",
+    "readMins": 5,
+    "category": "System Design",
+    "accent": "#7fe7ff",
+    "featured": false,
+    "excerpt": "Someone built those firmware gates. Someone designed the proprietary diagnostic protocol that kept independent repair shops out. They were probably proud of the work. The John Deere FTC settlement forces us to ask whether the AI infrastructure we are building today will look the same way in a decade.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "The FTC settlement forcing John Deere to open its repair tools and documentation to equipment owners and independent shops is being covered as an agriculture story. It is not. It is a system design story, and the protagonist is not a farmer or a regulator. It is the software engineer who sat down, wrote the firmware gate, designed the proprietary diagnostic API, and shipped it without ever once describing what they were doing as lock-in."
+      },
+      {
+        "t": "p",
+        "text": "Let me be direct about the mechanism before we get to the lesson. John Deere tractors are sophisticated embedded systems. The engine control units, transmission controllers, and hydraulics management layers all expose diagnostic data over internal buses. For years, the only tool that could speak the manufacturer's proprietary diagnostic protocol was software available exclusively to the authorized dealer network. If you owned the tractor, you could not run a diagnostic. If you were an independent shop, you could not run a diagnostic. The machine could be sitting in a field during harvest, throwing a fault code that an experienced mechanic could resolve in twenty minutes, and the practical answer was: wait for an authorized technician who might be days away. That outcome was not an accident of hardware. Every single chokepoint was a deliberate software decision."
+      },
+      {
+        "t": "h2",
+        "text": "How Engineers Build Cages Without Meaning To"
+      },
+      {
+        "t": "p",
+        "text": "Here is the uncomfortable part. Most engineers working on those systems were solving real problems. Proprietary diagnostic protocols can protect against unqualified modifications that destabilize safety-critical systems. Firmware signing prevents malicious code injection. Dealer-only tooling can enforce calibration standards. Each individual decision, reviewed in isolation, probably had a defensible engineering rationale attached to it. The cage emerges from the accumulation of those decisions, not from a single moment of malice."
+      },
+      {
+        "t": "p",
+        "text": "This is the exact dynamic that makes lock-in so hard to reason about while you are building. You are not designing a prison. You are making a series of locally sensible choices about authentication scope, API surface, data serialization format, and weight ownership. The control structure is a side effect, but it is a side effect with enormous leverage over the person on the other end. That leverage eventually attracts regulators, and regulators move slowly and bluntly. The John Deere settlement took over a decade of advocacy to produce."
+      },
+      {
+        "t": "h2",
+        "text": "The Same Architecture Is Being Reproduced in AI Infrastructure Right Now"
+      },
+      {
+        "t": "p",
+        "text": "The parallels to current AI and agentic system design are not subtle. Consider the four concrete patterns from the original framing of this problem and what they actually mean at the implementation level."
+      },
+      {
+        "t": "ul",
+        "items": [
+          "Proprietary embedding formats: When you index your documents against a vendor-managed embedding model, the vectors in your store are only meaningful within that vendor's similarity infrastructure. Switching providers means re-embedding your entire corpus, which is a non-trivial compute and cost event. Your data is yours, but its encoded form is not portable without paying an exit toll.",
+          "Opaque model API versioning: A managed API endpoint gives you no visibility into what changed between the model version you tested against and the one serving traffic today. Behavior drift is real, it is not always announced, and you have no mechanism to pin or audit it. This is functionally equivalent to a firmware update you did not authorize.",
+          "Agentic orchestration you cannot inspect or self-host: If your agent's tool-calling logic, memory management, and planning loop live inside a proprietary orchestration layer, you cannot audit the reasoning path, you cannot fork it when the vendor's incentives diverge from yours, and you cannot run it in an air-gapped environment for compliance reasons.",
+          "Fine-tuned weights you paid to produce but do not own: Some platforms retain ownership of fine-tuned derivatives even when the training compute and data were entirely yours. You have built a specialized capability on top of someone else's asset, and the terms determine whether you can move it."
+        ]
+      },
+      {
+        "t": "code",
+        "code": "# A question worth asking before you finalize your stack:\n\ndef audit_lock_in(component):\n    questions = [\n        \"Can I export my data in a portable, open format?\",\n        \"Can I pin the model or tool version I tested against?\",\n        \"Can I self-host or fork this layer if the vendor changes terms?\",\n        \"Do I own the weights or artifacts I paid to produce?\",\n        \"Can an independent party inspect or audit this system?\",\n    ]\n    # If the answer to most of these is 'no', you are not choosing a tool.\n    # You are accepting a dependency that may need a regulator to undo.\n    return questions",
+        "lang": "python"
+      },
+      {
+        "t": "h2",
+        "text": "The Choice Versus Drift Distinction"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/john-deere-right-to-repair-software-lock-in/2.png",
+        "alt": "The Choice Versus Drift Distinction"
+      },
+      {
+        "t": "p",
+        "text": "Closed, managed APIs are not inherently wrong. There are genuine tradeoffs. A well-run managed API offloads infrastructure burden, provides SLA guarantees, and lets a small team move faster than they could self-hosting an equivalent open-weight model. That is a real and sometimes correct tradeoff. The problem is not the choice. The problem is the absence of a choice, which is what happens when you adopt a closed dependency without auditing what it would cost to reverse the decision."
+      },
+      {
+        "t": "p",
+        "text": "Open alternatives exist across every layer of the modern AI stack. Open-weight models can be self-hosted and pinned to a specific checkpoint. Embedding models with permissive licenses let you run inference locally and store vectors in any format you own. Orchestration frameworks published under open-source licenses can be forked, modified, and deployed inside your own infrastructure. Using these is more operationally expensive upfront. The question is whether you are pricing that cost correctly against the option value of being able to exit, audit, or extend without permission from a third party."
+      },
+      {
+        "t": "h2",
+        "text": "What the Settlement Actually Means for Builders"
+      },
+      {
+        "t": "callout",
+        "text": "Regulators arriving to force open a system you built is a failure mode, not a correction. The window to design for user agency is before you ship, not after a decade of advocacy and a federal settlement.",
+        "label": "Engineering Takeaway"
+      },
+      {
+        "t": "p",
+        "text": "The John Deere outcome is, in one sense, a policy win. Equipment owners will get better access to their own machines. Independent repair shops will be able to compete. That is genuinely good. But no engineer should look at that outcome and feel comfortable because the regulator eventually fixed it. The better signal is that the system should not have required a regulator in the first place. The software decisions that produced a farmer waiting in a field for days while a crop window closes were made by engineers who did not think carefully enough about who the system was ultimately serving."
+      },
+      {
+        "t": "p",
+        "text": "The AI infrastructure decisions being made right now will compound for years. Embedding dependencies, orchestration choices, and weight ownership terms written into contracts today will determine how much leverage your users and your organization retain over the systems you are building. That leverage is worth auditing deliberately, before the architecture is set, before the vendor contracts are signed, and long before any regulator decides to take an interest. Build like someone will eventually need to repair what you shipped. Because they will."
+      }
+    ]
   }
 ]

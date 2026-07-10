@@ -1414,5 +1414,102 @@
         "text": "If you are building anything with live LLM inference and you have not yet drawn a hard latency line and asked whether your current architecture can actually hit it, that is the exercise worth doing this week. Run your full pipeline end-to-end under realistic conditions, measure time-to-first-audio or time-to-first-token, break the budget down stage by stage, and find out where you actually stand. The answer is usually more uncomfortable than the demo makes it look. That discomfort is useful information."
       }
     ]
+  },
+  {
+    "slug": "cache-conscious-data-layout-rust-false-sharing",
+    "title": "Cache-Conscious Data Layout in Rust: False Sharing, Field Zoning, and the 128-Byte Rule",
+    "dek": "Most AI engineers obsess over model architecture and never touch memory layout. In high-throughput inference servers, that omission is quietly killing your throughput.",
+    "date": "2026-07-09",
+    "readMins": 6,
+    "category": "System Design",
+    "accent": "#7fe7ff",
+    "featured": false,
+    "excerpt": "Your inference server is slow, and your model is not the reason. False sharing, poor field zoning, and cache-line boundary violations can silently destroy throughput in multi-core serving pipelines. Here is what is actually happening in memory and how to fix it deliberately.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "Weeks of careful attention-head tuning. Careful quantization passes. Thoughtful batching logic. And your LLM serving layer still bottlenecks at a fraction of the throughput you expected. I have seen this play out repeatedly in AI infrastructure work, and the culprit is almost never the model. It is the memory layout of the data structures wrapping it. Cache misses and false sharing are silent killers. They leave no obvious stack trace, no loud exception, just a gradual, grinding throughput ceiling that no amount of model optimization will lift."
+      },
+      {
+        "t": "h2",
+        "text": "The CPU Cache Is a Political System"
+      },
+      {
+        "t": "p",
+        "text": "To understand why memory layout matters, you need a working mental model of how modern CPU caches operate. L1 and L2 caches do not load individual bytes from RAM. They load cache lines, typically 64 bytes at a time on x86 hardware. When your program reads a single field, the processor fetches the entire surrounding 64-byte block into the cache hierarchy. This is usually a feature: spatial locality means nearby fields get a free ride into the fast cache. But in a multi-threaded system, that same feature becomes a liability."
+      },
+      {
+        "t": "p",
+        "text": "Modern processors maintain cache coherency across cores using protocols like MESI (Modified, Exclusive, Shared, Invalid). The unit of coherency is the cache line, not the individual variable. If Thread A on Core 1 writes to a field, and that field shares a cache line with a field that Thread B on Core 4 also writes to, the protocol must invalidate Core 4's copy of that entire 64-byte line on every write from Core 1, and vice versa. The two threads are writing to logically unrelated fields. They share no data. But they share a cache line, and that is enough to force a full coherency round-trip on every write. This is false sharing, and it can reduce multi-core throughput to levels worse than single-threaded execution."
+      },
+      {
+        "t": "h2",
+        "text": "Field Zoning and the Real Cost of Struct Packing"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/cache-conscious-data-layout-rust-false-sharing/1.png",
+        "alt": "Field Zoning and the Real Cost of Struct Packing"
+      },
+      {
+        "t": "p",
+        "text": "False sharing is one failure mode. Field zoning is another, subtler one. Consider a typical request context struct in an inference server. It might contain a request ID read on every scheduling decision, a priority score consulted on every queue operation, a large per-request configuration blob updated only at initialization, and a completion timestamp written exactly once. If you pack all of these fields into a single contiguous struct in the natural order they were added to the codebase, you create a hot-cold problem. Every time a scheduler thread reads the request ID or priority score, the processor loads the entire cache line, pulling in the cold configuration blob alongside the hot fields. You are burning L1 capacity on data you are not using."
+      },
+      {
+        "t": "p",
+        "text": "The fix is intentional field zoning: group fields by their access pattern, not by their semantic relationship. Hot fields that are read frequently should live together at the top of the struct. Cold fields that are written rarely or only at initialization should be grouped separately, ideally pushed to the end of the struct or placed in a separate heap-allocated sub-struct behind a pointer. In Rust, this discipline is particularly tractable because the language gives you explicit control over memory layout without a garbage collector shifting things around underneath you."
+      },
+      {
+        "t": "code",
+        "code": "use std::sync::atomic::{AtomicU64, Ordering};\n\n// BAD: hot and cold fields interleaved\n#[repr(C)]\nstruct RequestContextNaive {\n    request_id: u64,          // hot: read every scheduling tick\n    config_blob: [u8; 256],   // cold: written once at init\n    priority: f32,            // hot: read every queue op\n    completion_ts: u64,       // cold: written once on finish\n}\n\n// GOOD: fields zoned by access temperature\n#[repr(C)]\nstruct HotFields {\n    request_id: u64,\n    priority: f32,\n    _pad: [u8; 52], // pad to 64 bytes to own the full cache line\n}\n\n#[repr(C)]\nstruct ColdFields {\n    config_blob: [u8; 256],\n    completion_ts: u64,\n}\n\nstruct RequestContext {\n    hot: HotFields,\n    cold: Box<ColdFields>,\n}",
+        "lang": "rust"
+      },
+      {
+        "t": "p",
+        "text": "Notice the explicit padding in HotFields. That is not dead weight. It is a deliberate claim on a full 64-byte cache line, ensuring that no other field from any other struct can sneak onto the same line and trigger false sharing or contaminate the hot data with cold bytes."
+      },
+      {
+        "t": "h2",
+        "text": "The 128-Byte Rule and Spatial Prefetchers"
+      },
+      {
+        "t": "p",
+        "text": "Padding to 64 bytes handles the basic false sharing problem on most x86 hardware. But on Apple Silicon and certain modern x86 processors, the story has another chapter. These architectures include spatial prefetchers that operate on 128-byte aligned pairs of cache lines. The prefetcher observes access patterns and proactively pulls in the partner cache line when it detects sequential access. This is excellent for streaming workloads. It becomes a problem when a hot struct straddles the 128-byte boundary: the prefetcher triggers on the first cache line and pulls in the second, doubling the cache traffic for every access even when only a handful of bytes in the first line are relevant."
+      },
+      {
+        "t": "p",
+        "text": "The practical consequence is that in latency-critical serving code, padding to 64 bytes may not be enough. Aligning hot structs to 128-byte boundaries eliminates the straddle problem entirely and gives spatial prefetchers clean, predictable work to do. In Rust, you can enforce this with the repr(align) attribute."
+      },
+      {
+        "t": "code",
+        "code": "// Align to 128 bytes for spatial-prefetcher-friendly layout\n// on Apple Silicon and modern x86\n#[repr(C, align(128))]\nstruct PerThreadSchedulerState {\n    token_count: u64,\n    last_seen_seq: u64,\n    queue_depth: u32,\n    _pad: [u8; 116], // fill to 128 bytes\n}",
+        "lang": "rust"
+      },
+      {
+        "t": "p",
+        "text": "Each per-thread instance of this struct now owns exactly one 128-byte aligned region. Spatial prefetchers have a clean target. No thread's writes can invalidate another thread's cache line. The coherency protocol steps aside entirely for this struct."
+      },
+      {
+        "t": "h2",
+        "text": "Where This Shows Up in LLM Inference Pipelines"
+      },
+      {
+        "t": "p",
+        "text": "This is not an abstract concern. In a high-throughput LLM serving context, you typically have dozens to hundreds of threads handling concurrent requests. The scheduler struct is touched on every token generation step. KV-cache metadata, tracking which sequence IDs own which memory pages, is read and written continuously across threads. Request queue state is updated on every enqueue and dequeue operation. If any of these structs are laid out naively, you are paying false sharing tax proportional to your thread count and your token generation rate. At 64 threads generating tokens at high batch throughput, a single poorly-aligned scheduler field can create a coherency bottleneck that serializes what should be fully parallel work."
+      },
+      {
+        "t": "p",
+        "text": "The tricky part is that this degradation is invisible to most profiling approaches. Your CPU utilization looks high. Your threads are all running. The model forward pass time looks fine in isolation. The bottleneck shows up only when you measure memory bus traffic, cache miss rates, and inter-core coherency traffic with tools like Linux perf, Intel VTune, or Apple Instruments. Running perf stat with cache-misses and cache-references events before and after a layout change is the only honest way to know whether your padding is actually working."
+      },
+      {
+        "t": "callout",
+        "text": "Treat memory access patterns as a first-class design constraint, not an afterthought. When designing any struct that will be touched by multiple threads at high frequency, audit it for field temperature, pad hot mutable fields to 64-byte boundaries, align to 128 bytes on architectures with spatial prefetchers, and verify the improvement with hardware performance counters before shipping. Intuition is not enough. The CPU cache does not care about your mental model of the code.",
+        "label": "Engineering Takeaway"
+      },
+      {
+        "t": "p",
+        "text": "The broader point is that AI infrastructure work demands the same level of systems rigor as any other high-performance computing domain. The model architecture matters. The quantization strategy matters. But so does the memory layout of every struct that sits in the critical path between a token being scheduled and a token being returned. Engineers who internalize this stop asking why their finely tuned model is still slow and start asking what the CPU is actually doing between forward passes. That shift in perspective is where real throughput gains live."
+      }
+    ]
   }
 ]

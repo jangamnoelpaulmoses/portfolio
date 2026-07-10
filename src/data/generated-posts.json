@@ -1778,5 +1778,91 @@
         "text": "The AI infrastructure decisions being made right now will compound for years. Embedding dependencies, orchestration choices, and weight ownership terms written into contracts today will determine how much leverage your users and your organization retain over the systems you are building. That leverage is worth auditing deliberately, before the architecture is set, before the vendor contracts are signed, and long before any regulator decides to take an interest. Build like someone will eventually need to repair what you shipped. Because they will."
       }
     ]
+  },
+  {
+    "slug": "context-dev-structured-web-data-agentic-ingestion",
+    "title": "The Hardest Layer in Every Web-Connected Agent Is Not the Model",
+    "dek": "Context.dev is building an API for structured web data. That is interesting. What is more interesting is why this problem has quietly broken more production agent pipelines than bad prompts ever will.",
+    "date": "2026-07-10",
+    "readMins": 5,
+    "category": "Agentic AI",
+    "accent": "#7c5cff",
+    "featured": false,
+    "excerpt": "Every agent builder obsesses over the model, the orchestrator, and the prompt. The layer that actually kills production systems at 2am is the web ingestion layer, and most teams are holding it together with BeautifulSoup and prayer.",
+    "content": [
+      {
+        "t": "image",
+        "src": "/journal-images/context-dev-structured-web-data-agentic-ingestion/hero.png",
+        "alt": "The Hardest Layer in Every Web-Connected Agent Is Not the Model"
+      },
+      {
+        "t": "lead",
+        "text": "I have watched agent pipelines with genuinely good architecture fall apart in production, and the failure almost never originates where you expect. The prompts were clean. The tool-calling logic was solid. The orchestrator handled retries and state correctly. And then the system hit a real website, read garbage HTML back, and everything downstream collapsed. Nested tables with no semantic structure. JavaScript-rendered content that never existed in the raw HTTP response. Paywalled routes that returned a login redirect instead of data. Inconsistent field names across pages of the same domain. The model had no chance, not because the model was weak, but because the input was structurally broken before it ever arrived."
+      },
+      {
+        "t": "p",
+        "text": "A team coming out of YC, Context.dev, is building directly at this gap. Their core product is an API that returns structured data from any website. When I first heard the description, my instinct was to file it under scraping tooling and move on. But the more I thought about the actual failure modes I have seen in production agentic systems, the more I realized this is not a scraping problem. It is a data engineering problem, and the two are not the same thing."
+      },
+      {
+        "t": "h2",
+        "text": "Why the Ingestion Layer Breaks Everything"
+      },
+      {
+        "t": "p",
+        "text": "When people architect an agent system on a whiteboard, the web ingestion step gets a single box. Fetch data. The box is deceiving. In practice, fetching reliable, structured, agent-ready data from the live web involves at least four distinct technical layers, and each one has its own failure modes."
+      },
+      {
+        "t": "ul",
+        "items": [
+          "Fetch layer: raw HTTP requests, JavaScript rendering via headless browsers, authentication handling, bot detection bypass, and rate limit management.",
+          "Parse layer: extracting meaningful signal from noisy HTML, identifying tables, lists, prices, dates, and product attributes among a sea of nav elements, ads, and layout scaffolding.",
+          "Schema layer: normalizing extracted values into typed, consistently named fields that an LLM or downstream tool can actually reason over without hallucinating field relationships.",
+          "Freshness layer: cache TTL policies, change detection against previous snapshots, and re-fetch triggers when stale data would silently corrupt an agent decision."
+        ]
+      },
+      {
+        "t": "p",
+        "text": "Most teams I have seen treat all four of these as one. They reach for BeautifulSoup, bolt on a random scraping SaaS for the JavaScript-rendered cases, write a few regex patterns for the fields they care about today, and move on. This works right up until the website changes its layout, starts rendering behind a client-side framework, or begins returning different schemas for mobile versus desktop user agents. Then it fails silently, which is worse than failing loudly."
+      },
+      {
+        "t": "h2",
+        "text": "The Concrete Engineering Problem"
+      },
+      {
+        "t": "p",
+        "text": "Let me make this tangible. Suppose your agent needs live pricing data from an e-commerce site to make a purchasing recommendation. The fetch layer has to handle the fact that the price is injected by JavaScript after the initial HTML load, which means a plain HTTP GET returns a price field that is empty or absent. You need a headless browser execution step, something like Playwright or Puppeteer, to get the rendered DOM."
+      },
+      {
+        "t": "code",
+        "code": "from playwright.sync_api import sync_playwright\n\ndef fetch_rendered_html(url: str) -> str:\n    with sync_playwright() as p:\n        browser = p.chromium.launch(headless=True)\n        page = browser.new_page()\n        page.goto(url, wait_until=\"networkidle\")\n        html = page.content()\n        browser.close()\n    return html",
+        "lang": "python"
+      },
+      {
+        "t": "p",
+        "text": "You now have the rendered HTML. The parse layer still needs to locate the price within a DOM that might look completely different across product categories. A CSS selector that works for electronics may not work for apparel. You need either a robust rule set per domain, which does not scale, or a semantic extraction approach that understands that a string matching a currency pattern adjacent to an add-to-cart element is probably the price. The schema layer then needs to decide whether that value is a string, a float, and what currency it is denominated in, before it gets handed to the agent as a typed field it can compare and reason over. Miss any one of these steps and your agent either throws an exception or, more dangerously, reasons confidently over a wrong value."
+      },
+      {
+        "t": "h2",
+        "text": "You Are Building a Data Engineering System, Not a Model Pipeline"
+      },
+      {
+        "t": "p",
+        "text": "This distinction is not semantic. It changes how you design for failure. A model pipeline fails and you tune a prompt. A data engineering system fails and you need observability into which layer broke, why, and whether the failure was transient or structural. You need schema versioning so you know when a site's data shape changed. You need freshness guarantees so your agent does not act on hour-old inventory data in a context where seconds matter. You need circuit breakers so a single bad domain does not propagate garbage through the rest of your pipeline."
+      },
+      {
+        "t": "callout",
+        "text": "Before you add another reasoning step or tool to your agent, audit your ingestion layer. Map each of the four layers explicitly: fetch, parse, schema, and freshness. For each one, define what a silent failure looks like and whether you would catch it before it reaches the model. If the answer is no for any layer, that is your highest-priority reliability risk, not your prompt.",
+        "label": "Engineering Takeaway"
+      },
+      {
+        "t": "h2",
+        "text": "What an API at This Layer Actually Needs to Solve"
+      },
+      {
+        "t": "p",
+        "text": "The reason a dedicated API approach is interesting here, and why Context.dev caught my attention, is that solving these four layers well is genuinely expensive to do in-house. Headless browser infrastructure at scale is non-trivial to operate. Maintaining domain-specific parsing logic across thousands of sites is a full-time data engineering job. Schema normalization that generalizes requires either a large rule base or an ML layer trained on structured extraction. Freshness management requires change detection infrastructure. None of this is what an AI product team should be spending its engineering cycles on. The teams that build this themselves are usually doing it because they do not realize how deep the hole goes until they are already in it at 2am watching their agent pipeline return confidently wrong answers. The most important architectural decision you can make for a web-connected agent is to treat ingestion as a first-class engineering concern before you ever write your first prompt."
+      }
+    ],
+    "cover": "/journal-images/context-dev-structured-web-data-agentic-ingestion/hero.png"
   }
 ]

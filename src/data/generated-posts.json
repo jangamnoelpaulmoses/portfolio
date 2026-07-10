@@ -1230,5 +1230,97 @@
       }
     ],
     "cover": "/journal-images/luks-suspend-key-wipe-regression-linux69/hero.png"
+  },
+  {
+    "slug": "pgrust-postgres-rewritten-rust-100pct",
+    "title": "pgrust: What Passing 100% of Postgres Regression Tests Actually Means",
+    "dek": "Rewriting Postgres in Rust is not a compiler exercise. It is a behavioral fidelity problem — and clearing every regression test is the most honest signal yet that Rust is ready for foundational systems work.",
+    "date": "2026-07-09",
+    "readMins": 6,
+    "category": "System Design",
+    "accent": "#7fe7ff",
+    "featured": false,
+    "excerpt": "Someone rewrote Postgres in Rust and passed every single regression test. Before you shrug that off as a compiler milestone, let me tell you exactly why that is one of the harder engineering achievements you will read about this year.",
+    "content": [
+      {
+        "t": "lead",
+        "text": "Someone rewrote Postgres in Rust and passed every single regression test. Before you shrug that off as a compiler milestone, let me tell you exactly why that is one of the harder engineering achievements you will read about this year. Postgres is not a side project you can fake your way through. It is thirty-plus years of accumulated correctness, and the regression suite is the only honest judge of whether your rewrite actually understood the assignment."
+      },
+      {
+        "t": "p",
+        "text": "The project is called pgrust, it is open source at github.com/malisper/pgrust, and the headline is deceptively simple: it passes 100% of Postgres regression tests. People who have not worked deeply with Postgres internals might read that as 'the tests are green, ship it.' Engineers who have spent real time in that codebase will read it differently. They will understand that the regression suite is not a collection of unit tests checking isolated function outputs. It is a behavioral contract covering SQL conformance, type coercion rules, transaction semantics, query planner behavior, extension hooks, and a sprawling mass of edge cases that are not documented anywhere except in the test expectations themselves. Clearing all of it means you did not just implement Postgres. You replicated its personality."
+      },
+      {
+        "t": "h2",
+        "text": "The Regression Suite Is Not a Test Suite. It Is the Spec."
+      },
+      {
+        "t": "p",
+        "text": "This is the first thing worth internalizing. Postgres does not have a formal specification the way an IETF protocol does. There is no document you can open and derive a ground-truth implementation from. The behavior of the C codebase is the specification. Every quirk in how a type coercion resolves, every specific error message string, every edge in how the planner chooses between two equivalent plans — all of it constitutes the contract your rewrite must honor. The regression tests check exact output. Not approximate output. Not semantically equivalent output. Exact output, down to whitespace and error message wording."
+      },
+      {
+        "t": "p",
+        "text": "This is the same philosophy that makes SQLite and curl so remarkable as artifacts. The maintainers of those projects long ago stopped thinking of the software as an implementation of an idea and started treating it as the idea itself. You cannot ship a compatible replacement for curl by reading the HTTP RFCs. You ship it by matching curl's actual behavior across thirty years of real-world quirks. pgrust is operating in that same territory. The bar is not correctness in the abstract. The bar is behavioral fidelity to a specific C program that has been running production databases since before most working engineers entered the industry."
+      },
+      {
+        "t": "h2",
+        "text": "Why Mapping C Postgres onto Rust Is a Design Problem, Not a Translation Problem"
+      },
+      {
+        "t": "image",
+        "src": "/journal-images/pgrust-postgres-rewritten-rust-100pct/1.png",
+        "alt": "Why Mapping C Postgres onto Rust Is a Design Problem, Not a Translation Problem"
+      },
+      {
+        "t": "p",
+        "text": "Here is where the technical depth gets interesting. Postgres's C codebase is built around manual memory management in ways that are architectural, not incidental. The memory context system, for example, is a hand-rolled arena allocator that lives at the heart of query execution. Palloc and related primitives let Postgres allocate memory in a context-aware way and then free entire subtrees of allocations at once when a transaction or query scope ends. This is elegant for C, but it does not map cleanly onto Rust's ownership and borrow semantics."
+      },
+      {
+        "t": "p",
+        "text": "In Rust, the compiler enforces at compile time that a value has exactly one owner, and that references to a value cannot outlive it. This is precisely what prevents entire classes of use-after-free and dangling pointer bugs. But Postgres's memory model leans heavily on arena-style lifetimes that are determined at runtime, not statically. Bridging that gap requires genuine design work. You are not mechanically translating syntax. You are deciding how to express a runtime lifetime discipline inside a type system that wants to reason about lifetimes statically. That means choices about where to use reference counting, where to use raw pointers wrapped in unsafe blocks, and where to restructure ownership entirely so the compiler can track it."
+      },
+      {
+        "t": "code",
+        "code": "// A simplified illustration of the kind of arena ownership problem\n// you encounter when porting palloc-style code into Rust.\n// Postgres's MemoryContext forms a tree; child contexts are freed\n// when the parent is reset. Expressing that in safe Rust requires\n// an explicit lifetime or a managed reference type.\n\nstruct MemoryContext<'arena> {\n    parent: Option<&'arena MemoryContext<'arena>>,\n    // allocations logically owned by this context\n}\n\n// The compiler now enforces that no allocation outlives its context,\n// which is the invariant Postgres enforces manually at runtime.\n// Getting this right across the full codebase is the actual hard work.",
+        "lang": "rust"
+      },
+      {
+        "t": "p",
+        "text": "Beyond memory, Postgres carries decades of implicit assumptions in its internals about things like integer overflow behavior, signed-versus-unsigned arithmetic, and the ordering of side effects in expressions. C and Rust have different rules in some of these areas, and a rewrite has to account for each one explicitly. There is no shortcut. Every place where C's undefined behavior was incidentally benign in the original code is a place where the Rust rewrite has to make a deliberate choice and verify that the output still matches."
+      },
+      {
+        "t": "h2",
+        "text": "What This Signals About Rust in Foundational Systems Software"
+      },
+      {
+        "t": "p",
+        "text": "The narrative around Rust for the past several years has leaned heavily on greenfield use cases: new microservices, new CLI tooling, new network proxies. Those are genuine wins, but they do not prove the hardest thing. They do not prove that Rust can replace something you cannot afford to break. pgrust is a proof point in that harder category."
+      },
+      {
+        "t": "p",
+        "text": "The significance is not just that Rust can express the same logic as C. It is that a team was able to take one of the most complex and behavior-sensitive codebases in existence, rewrite it in a language with fundamentally different memory semantics, and produce something that the existing test suite cannot distinguish from the original. That is a strong statement about Rust's expressiveness for systems-level code. It also says something about the maturity of the ecosystem around unsafe Rust. Writing a database engine requires reaching past the borrow checker in controlled ways, and doing that correctly across a codebase of this complexity is not trivial."
+      },
+      {
+        "t": "callout",
+        "text": "Behavioral fidelity is harder than feature parity. Anyone can list the SQL features they support. Passing the exact output of thirty years of regression tests means you understood the implicit contract, not just the documented one. That is the bar that matters for replacing foundational infrastructure.",
+        "label": "Engineering Takeaway"
+      },
+      {
+        "t": "h2",
+        "text": "The Engineering Lesson Worth Carrying Forward"
+      },
+      {
+        "t": "p",
+        "text": "If you work on systems software, the pgrust milestone deserves attention for a reason beyond the Rust angle. It is a case study in what serious compatibility work actually requires. The team did not set out to build something Postgres-like. They built something that the Postgres test suite accepts as Postgres. That distinction shapes every architectural decision: you cannot optimize in ways that change edge-case output, you cannot clean up error messages, you cannot reorder anything that the tests can observe."
+      },
+      {
+        "t": "p",
+        "text": "That discipline is what separates a research prototype from a production replacement. It is the same discipline that makes OpenSSL reimplementations so treacherous, or that makes a new filesystem driver so hard to certify. The artifact you are replacing has accumulated behavioral surface area that no one fully mapped out. Your job is to match all of it, including the parts that were accidental. pgrust appears to have done that. Whether it eventually becomes a viable production path for Postgres workloads is a separate question that will depend on performance characteristics, extension compatibility, and operational tooling. But the regression milestone alone is worth pausing on. It is Rust earning its place in the room where foundational software actually lives."
+      },
+      {
+        "t": "p",
+        "text": "Go read the code at github.com/malisper/pgrust. Even if you never deploy it, the way the codebase handles the memory context problem and the places it reaches for unsafe are an education in what it looks like to take Rust seriously as a systems language rather than as a safer scripting tool. That is the kind of open source work that moves the whole field forward."
+      }
+    ]
   }
 ]

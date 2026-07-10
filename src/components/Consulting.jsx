@@ -74,16 +74,6 @@ export default function Consulting() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a
-              href={consult.newsletterHref}
-              target="_blank"
-              rel="noreferrer"
-              data-cursor
-              className="btn"
-            >
-              <span>Read the newsletter</span>
-              <span aria-hidden>↗</span>
-            </a>
-            <a
               href={consult.bookHref}
               target="_blank"
               rel="noreferrer"

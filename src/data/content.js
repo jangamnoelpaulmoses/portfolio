@@ -18,7 +18,7 @@ export const profile = {
       href: 'https://www.linkedin.com/in/noel-paul-moses-j',
     },
     { label: 'GitHub', href: 'https://github.com/jangamnoelpaulmoses' },
-    { label: 'Book a call', href: 'https://topmate.io/noelpaulmoses' },
+    { label: 'Book a call', href: 'https://topmate.io/noel_paul_moses_j' },
     { label: 'Email', href: 'mailto:jangamnoelpaulmoses@gmail.com' },
     { label: 'HireHack', href: 'https://hirehack.ai' },
     { label: 'Naviget', href: 'https://naviget.com' },
@@ -34,7 +34,7 @@ export const profile = {
 // Consultation / 1:1 — positioned for when the site matures into a booking funnel.
 export const consult = {
   available: true,
-  bookHref: 'https://topmate.io/noelpaulmoses',
+  bookHref: 'https://topmate.io/noel_paul_moses_j',
   newsletterHref: 'https://noelpaulmoses.substack.com',
   blurb:
     'I take a small number of 1:1 sessions each month with engineers and founders shipping AI into production — agentic systems, retrieval, and the system design that keeps them from melting at scale.',

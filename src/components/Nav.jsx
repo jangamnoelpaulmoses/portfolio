@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { navLinks, profile } from '../data/content';
+import { navLinks, profile, consult } from '../data/content';
 import { getLenis } from '../lib/useLenis';
 
 export default function Nav() {
@@ -160,7 +160,7 @@ export default function Nav() {
               ))}
             </ul>
             <a
-              href={profile.consultHref || 'https://topmate.io/noelpaulmoses'}
+              href={consult.bookHref}
               target="_blank"
               rel="noreferrer"
               className="btn btn-primary mt-10 w-fit"
